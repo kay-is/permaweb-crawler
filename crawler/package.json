@@ -1,0 +1,35 @@
+{
+  "name": "permaweb-crawler",
+  "description": "A web crawler for the Permaweb.",
+  "version": "0.0.12",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx modules/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "build:docker": "docker build -t permaweb-crawler .",
+    "start:docker": "docker run -d -p 3000:3000 permaweb-crawler",
+    "dev:docker": "docker run -d -p 3000:3000 -v ./storage:/home/myuser/storage $(docker build -q .)"
+  },
+  "author": "Kay Plößer",
+  "license": "AGPL-3.0-only",
+  "devDependencies": {
+    "@swc/core": "^1.13.3",
+    "@swc/helpers": "^0.5.17",
+    "@total-typescript/ts-reset": "^0.6.1",
+    "@types/node": "^22.17.0",
+    "prettier": "^3.6.2",
+    "regenerator-runtime": "^0.14.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@ar.io/wayfinder-core": "^1.1.1",
+    "@dsnp/parquetjs": "^1.8.7",
+    "@trpc/server": "^11.4.3",
+    "crawlee": "^3.14.0",
+    "node-html-parser": "^7.0.1",
+    "playwright": "^1.54.2",
+    "valibot": "^1.1.0"
+  }
+}
