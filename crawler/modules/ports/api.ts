@@ -1,8 +1,11 @@
-import type { TaskEntity } from "../entities.js"
+import type { CrawlTaskConfig, CrawlTask } from "../entities.js"
 
-export type CreateTaskHandler = (taskDefinition: Omit<TaskEntity, "id">) => Promise<TaskEntity>
+export type CreateTaskHandler = (taskDefinition: CrawlTaskConfig) => Promise<CrawlTask>
 
-export interface ApiPort {
-  start(): Promise<void>
-  set createTaskHandler(callback: CreateTaskHandler)
+export type ApiHandlers = {
+  createTask: CreateTaskHandler
+}
+
+export interface ApiInput {
+  start(handlers: ApiHandlers): Promise<void>
 }

@@ -1,28 +1,32 @@
-import type { ApiClientPort } from "./ports/apiClient.js"
-import type { StoragePort } from "./ports/storage.js"
-import type { TaskConfigEntity } from "../../crawler/modules/entities.js"
+import * as WorkerClientPort from "./ports/workerClient.js"
+import * as TaskStoragePort from "./ports/taskStorage.js"
 
-export interface ClientServiceAdapters {
-  taskConfigStore: StoragePort<TaskConfigEntity>
-  apiClient: ApiClientPort
+export interface ClientServiceConfig {
+  adapters: {
+    inputs: {
+      taskConfigStore: TaskStoragePort.TaskStorageInput
+    }
+    outputs: {
+      workerClient: WorkerClientPort.WorkerClientOutput
+    }
+  }
 }
 
 export class ClientService {
-  #taskConfigStore: StoragePort<TaskConfigEntity>
-  #apiClient: ApiClientPort
+  #inputs: ClientServiceConfig["adapters"]["inputs"]
+  #outputs: ClientServiceConfig["adapters"]["outputs"]
 
-  static async start(adapters: ClientServiceAdapters) {
-    const client = new ClientService(adapters)
-    return await client.start()
+  static async start(config: ClientServiceConfig) {
+    return new ClientService(config).start()
   }
 
-  constructor(adapters: ClientServiceAdapters) {
-    this.#taskConfigStore = adapters.taskConfigStore
-    this.#apiClient = adapters.apiClient
+  constructor(config: ClientServiceConfig) {
+    this.#inputs = config.adapters.inputs
+    this.#outputs = config.adapters.outputs
   }
 
   async start() {
-    const taskConfig = await this.#taskConfigStore.load("docs")
-    return this.#apiClient.createTask(taskConfig)
+    const taskConfig = await this.#inputs.taskConfigStore.load("docs")
+    return this.#outputs.workerClient.createTask(taskConfig)
   }
 }

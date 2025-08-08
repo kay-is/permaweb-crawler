@@ -1,6 +1,11 @@
 import type { GatewayUrl, WayfinderUrl } from "../entities.js"
 
-export type CrawlerScrapingHandlerInput = {
+export type CrawlerRequest = {
+  gatewayUrl: GatewayUrl
+  wayfinderUrl: WayfinderUrl
+}
+
+export type CrawlerPageData = {
   taskId: string
   wayfinderUrl: WayfinderUrl
   gatewayUrl: GatewayUrl
@@ -14,19 +19,23 @@ export type CrawlerScrapingHandlerOutput = {
   uniqueKey: WayfinderUrl
 }
 
-export type CrawlerErrorHandlerInput = {
+export type CrawlerErrorHandlerData = {
   failedUrl: GatewayUrl
   retryCount: number
   errorMessages: string[]
 }
 
-export type CrawlerHandlers = {
-  Scraping: (input: CrawlerScrapingHandlerInput) => Promise<CrawlerScrapingHandlerOutput[]>
-  Error: (input: CrawlerErrorHandlerInput) => Promise<string>
+export type PageDataHandler = (pageData: CrawlerPageData) => Promise<CrawlerScrapingHandlerOutput[]>
+export type ScrapingErrorHandler = (errorData: CrawlerErrorHandlerData) => Promise<string>
+
+export type CrawlerConfig = {
+  taskId: string
+  initialRequests: CrawlerRequest[]
+  extractHashUrls: boolean
+  pageDataHandler: PageDataHandler
+  scrapingErrorHandler: ScrapingErrorHandler
 }
 
-export interface CrawlerPort {
-  start(taskId: string, requests: { url: string; uniqueKey: string }[]): Promise<void>
-  set scrapingHandler(callback: CrawlerHandlers["Scraping"])
-  set scrapingErrorHandler(callback: CrawlerHandlers["Error"])
+export interface CrawlerInput {
+  start(config: CrawlerConfig): Promise<void>
 }

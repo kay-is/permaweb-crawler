@@ -1,9 +1,9 @@
-import type { ScrapingDataEntity } from "../entities.js"
+import type { PageData } from "../entities.js"
 
-export interface Storage {
-  save(data: ScrapingDataEntity): Promise<void>
+export interface ResultStore {
+  save(data: PageData): Promise<void>
 }
 
-export interface StoragePort {
-  open(storageId: string): Promise<Storage>
+export interface StorageOutput {
+  open(storageId: string): Promise<ResultStore>
 }

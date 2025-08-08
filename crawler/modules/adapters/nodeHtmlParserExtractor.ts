@@ -1,11 +1,11 @@
-import parser from "node-html-parser"
+import * as NodeHtmlParser from "node-html-parser"
 
-import type { HtmlDataEntity } from "../entities.js"
-import type { ExtractorPort } from "../ports/extractor.js"
+import type * as Entities from "../entities.js"
+import type * as ExtractorPort from "../ports/extractor.js"
 
-export class NodeHtmlParserExtractorAdapter implements ExtractorPort {
-  async extract(html: string): Promise<HtmlDataEntity> {
-    const document = parser.parse(html)
+export class NodeHtmlParserExtractorAdapter implements ExtractorPort.ExtractorUtil {
+  async extract(html: string): Promise<Entities.HtmlData> {
+    const document = NodeHtmlParser.parse(html)
 
     // Normalize HTML
     document.querySelectorAll("style").forEach((element) => element.remove())

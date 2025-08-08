@@ -1,37 +1,50 @@
-import * as v from "valibot"
-import { initTRPC } from "@trpc/server"
-import { createHTTPServer } from "@trpc/server/adapters/standalone"
+import * as TrpcServer from "@trpc/server"
+import * as TrpcServreAdaptreStandalone from "@trpc/server/adapters/standalone"
 
-import type { ApiPort, CreateTaskHandler } from "../ports/api.js"
-import { taskEntitySchema } from "../entities.js"
+import * as Entities from "../entities.js"
+import type * as ApiPort from "../ports/api.js"
 
-export class TrpcAdapter implements ApiPort {
-  #trpc = initTRPC.create()
+export type AppRouter = TrpcApiAdapter["appRouter"]
 
-  appRouter = this.#trpc.router({
+export type TrpcApiAdapterConfig = {
+  port: number
+}
+
+export class TrpcApiAdapter implements ApiPort.ApiInput {
+  #port: number
+  #createTaskHandler?: ApiPort.CreateTaskHandler
+
+  #trpc = TrpcServer.initTRPC.create()
+  #appRouter = this.#trpc.router({
     createTask: this.#trpc.procedure
-      .input(v.omit(taskEntitySchema, ["id"]))
-      .output(taskEntitySchema)
+      .input(Entities.crawlTaskConfigSchema)
+      .output(Entities.crawlTaskSchema)
       .mutation(({ input }) => {
         if (!this.#createTaskHandler) throw new Error("No createTaskHandler set!")
         return this.#createTaskHandler(input)
       }),
   })
 
-  #createTaskHandler?: CreateTaskHandler
-  set createTaskHandler(callback: CreateTaskHandler) {
-    this.#createTaskHandler = callback
+  // for type extraction
+  get appRouter() {
+    return this.#appRouter
   }
 
-  async start() {
-    const server = createHTTPServer({ router: this.appRouter })
+  constructor(config: TrpcApiAdapterConfig) {
+    this.#port = config.port
+  }
+
+  async start(handlers: ApiPort.ApiHandlers) {
+    this.#createTaskHandler = handlers.createTask
+
+    const server = TrpcServreAdaptreStandalone.createHTTPServer({ router: this.#appRouter })
 
     return new Promise<void>((resolve, reject) => {
       server.on("listening", () => {
         resolve()
       })
       try {
-        server.listen(3000)
+        server.listen(this.#port)
       } catch (e) {
         reject(e)
       }

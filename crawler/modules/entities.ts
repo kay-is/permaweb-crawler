@@ -1,5 +1,8 @@
 import * as v from "valibot"
 
+export const arweaveTxIdSchema = v.pipe(v.string(), v.length(43))
+export type ArweaveTxId = v.InferInput<typeof arweaveTxIdSchema>
+
 export const arnsNameSchema = v.pipe(v.string(), v.trim(), v.regex(/^[a-zA-Z0-9_-]*$/))
 export type ArnsName = v.InferInput<typeof arnsNameSchema>
 
@@ -13,18 +16,21 @@ export const gatewayUrlSchema = v.pipe(
 )
 export type GatewayUrl = `https://${string}.${string}`
 
-export const taskEntitySchema = v.object({
+export const crawlerTypesSchema = v.union([v.literal("browser") /* v.literal("html") */])
+export type CrawlerTypes = v.InferInput<typeof crawlerTypesSchema>
+
+export const crawlTaskSchema = v.object({
   id: v.string(),
   arnsNames: v.array(arnsNameSchema),
   executeJavaScript: v.boolean(),
   extractHashUrls: v.boolean(),
 })
-export type TaskEntity = v.InferInput<typeof taskEntitySchema>
+export type CrawlTask = v.InferInput<typeof crawlTaskSchema>
 
-export const taskConfigEntitySchema = v.omit(taskEntitySchema, ["id"])
-export type TaskConfigEntity = v.InferInput<typeof taskConfigEntitySchema>
+export const crawlTaskConfigSchema = v.omit(crawlTaskSchema, ["id"])
+export type CrawlTaskConfig = v.InferInput<typeof crawlTaskConfigSchema>
 
-export const htmlDataEntitySchema = v.object({
+export const htmlDataSchema = v.object({
   charset: v.string(),
   language: v.string(),
   title: v.string(),
@@ -38,10 +44,11 @@ export const htmlDataEntitySchema = v.object({
   normalizedHtml: v.string(),
 })
 
-export type HtmlDataEntity = v.InferInput<typeof htmlDataEntitySchema>
+export type HtmlData = v.InferInput<typeof htmlDataSchema>
 
-export const scrapingDataEntitySchema = v.object({
-  ...htmlDataEntitySchema.entries,
+export const pageDataSchema = v.object({
+  ...htmlDataSchema.entries,
+  txId: arweaveTxIdSchema,
   wayfinderUrl: wayfinderUrlSchema,
   gatewayUrl: gatewayUrlSchema,
   headers: v.array(
@@ -54,4 +61,4 @@ export const scrapingDataEntitySchema = v.object({
   absoluteUrls: v.array(v.string()),
 })
 
-export type ScrapingDataEntity = v.InferInput<typeof scrapingDataEntitySchema>
+export type PageData = v.InferInput<typeof pageDataSchema>

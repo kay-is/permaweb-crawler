@@ -1,10 +1,16 @@
-import { TaskConfigStorageAdapter } from "./adapters/taskConfigStorage.js"
-import { TrpcApiClientAdapter } from "./adapters/trpcApiClient.js"
+import { FsTaskConfigStorageAdapter } from "./adapters/fsTaskConfigStorage.js"
+import { TrpcWorkerClientAdapter } from "./adapters/trpcWorkerClient.js"
 import { ClientService } from "./clientService.js"
 
 console.info("Starting client...")
 const taskId = await ClientService.start({
-  apiClient: new TrpcApiClientAdapter("http://localhost:3000"),
-  taskConfigStore: new TaskConfigStorageAdapter("fixtures"),
+  adapters: {
+    inputs: {
+      taskConfigStore: new FsTaskConfigStorageAdapter("fixtures"),
+    },
+    outputs: {
+      workerClient: new TrpcWorkerClientAdapter("http://localhost:3000"),
+    },
+  },
 })
 console.log("Received Task ID:", taskId)
