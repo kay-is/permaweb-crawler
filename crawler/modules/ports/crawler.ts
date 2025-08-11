@@ -1,32 +1,33 @@
-import type { GatewayUrl, WayfinderUrl } from "../entities.js"
+import type * as Entities from "../entities.js"
 
 export type CrawlerRequest = {
-  gatewayUrl: GatewayUrl
-  wayfinderUrl: WayfinderUrl
+  gatewayUrl: Entities.GatewayUrl
+  wayfinderUrl: Entities.WayfinderUrl
 }
 
 export type CrawlerPageData = {
   taskId: string
-  wayfinderUrl: WayfinderUrl
-  gatewayUrl: GatewayUrl
+  wayfinderUrl: Entities.WayfinderUrl
+  gatewayUrl: Entities.GatewayUrl
   headers: { name: string; value: string }[]
   html: string
   foundUrls: string[]
 }
 
 export type CrawlerScrapingHandlerOutput = {
-  url: GatewayUrl
-  uniqueKey: WayfinderUrl
+  url: Entities.GatewayUrl
+  uniqueKey: Entities.WayfinderUrl
 }
 
 export type CrawlerErrorHandlerData = {
-  failedUrl: GatewayUrl
+  failedUrl: Entities.GatewayUrl
   retryCount: number
   errorMessages: string[]
 }
 
-export type PageDataHandler = (pageData: CrawlerPageData) => Promise<CrawlerScrapingHandlerOutput[]>
+export type PageDataHandler = (pageData: CrawlerPageData) => Promise<void>
 export type ScrapingErrorHandler = (errorData: CrawlerErrorHandlerData) => Promise<string>
+export type ResolveUrlHandler = (gatewayUrl: Entities.GatewayUrl) => Promise<{gatewayUrl: Entities.GatewayUrl, wayfinderUrl: Entities.WayfinderUrl}>
 
 export type CrawlerConfig = {
   taskId: string
@@ -34,6 +35,7 @@ export type CrawlerConfig = {
   extractHashUrls: boolean
   pageDataHandler: PageDataHandler
   scrapingErrorHandler: ScrapingErrorHandler
+  resolveUrlHandler: ResolveUrlHandler
 }
 
 export interface CrawlerInput {

@@ -1,13 +1,13 @@
+import * as v from "valibot"
 import * as Crawlee from "crawlee"
 import * as Playwright from "playwright-core"
 
-import type * as Entities from "../entities.js"
+import * as Entities from "../entities.js"
 import type * as CrawlerPort from "../ports/crawler.js"
 
 export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput {
   #taskId?: string
   #extractHashUrls?: boolean
-  #requestQueue?: Crawlee.RequestQueue
 
   #pageDataHandler?: CrawlerPort.PageDataHandler
   #scrapingErrorHandler?: CrawlerPort.ScrapingErrorHandler
@@ -15,13 +15,46 @@ export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput
   async start(config: CrawlerPort.CrawlerConfig) {
     this.#taskId = config.taskId
     this.#extractHashUrls = config.extractHashUrls
-    this.#requestQueue = await Crawlee.RequestQueue.open(config.taskId)
+
+    const requestQueue = await Crawlee.RequestQueue.open(config.taskId)
+
+    const addRequests = requestQueue.addRequests.bind(requestQueue)
+
+    // Override addRequests to update the gateway of the found URLs
+    // and change the unqieKey to WayfinderUrls to ensure uniqueness
+    requestQueue.addRequests = async (requests) => {
+      const updatedRequests: Crawlee.Source[] = []
+      for await (const request of requests) {
+        const oldGatewayUrl = typeof request === "string" ? request : request.url
+        if (!oldGatewayUrl) continue
+
+        if (!config.extractHashUrls && oldGatewayUrl.includes("#")) continue
+
+        // TODO: Improve URL validation
+        const validUrl = v.parse(Entities.gatewayUrlSchema, oldGatewayUrl) as
+          | Entities.GatewayUrl
+          | undefined
+        if (!validUrl) {
+          console.warn(`Invalid gateway URL: ${oldGatewayUrl}`)
+          continue
+        }
+
+        let { gatewayUrl, wayfinderUrl } = await config.resolveUrlHandler(validUrl)
+
+        updatedRequests.push({
+          url: gatewayUrl,
+          uniqueKey: wayfinderUrl,
+        })
+      }
+
+      return addRequests(updatedRequests)
+    }
 
     this.#pageDataHandler = config.pageDataHandler
     this.#scrapingErrorHandler = config.scrapingErrorHandler
 
     const crawler = new Crawlee.PlaywrightCrawler({
-      requestQueue: this.#requestQueue,
+      requestQueue,
       launchContext: { launcher: Playwright.chromium },
       requestHandler: this.#playwrightRequestHandler.bind(this),
       errorHandler: this.#playwrightErrorHandler.bind(this),
@@ -34,6 +67,8 @@ export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput
         uniqueKey: wayfinderUrl,
       })),
     )
+
+    process.exit(0)
   }
 
   async #playwrightRequestHandler(context: Crawlee.PlaywrightCrawlingContext) {
@@ -59,7 +94,7 @@ export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput
     const headers = (await context.response?.headers()) ?? {}
     const headersArray = Object.entries(headers).map(([name, value]) => ({ name, value }))
 
-    const newRequests = await this.#pageDataHandler({
+    await this.#pageDataHandler({
       taskId: this.#taskId,
       wayfinderUrl: context.request.uniqueKey as Entities.WayfinderUrl,
       gatewayUrl: context.request.url as Entities.GatewayUrl,
@@ -68,7 +103,7 @@ export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput
       headers: headersArray,
     })
 
-    await this.#requestQueue?.addRequests(newRequests)
+    await context.enqueueLinks()
   }
 
   async #playwrightErrorHandler(context: Crawlee.BrowserCrawlingContext) {

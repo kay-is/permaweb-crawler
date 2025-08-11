@@ -30,7 +30,7 @@ export class StaticWayfinderResolverAdapter implements ResolverPort.ResolverUtil
     return resolvedUrl.toString() as Entities.GatewayUrl
   }
 
-  async desolve(url: Entities.GatewayUrl | URL): Promise<Entities.WayfinderUrl> {
+  async dissolve(url: Entities.GatewayUrl | URL): Promise<Entities.WayfinderUrl> {
     const wayfinderUrl = new URL(url)
     wayfinderUrl.hostname = wayfinderUrl.hostname.split(".").shift() as string
     return wayfinderUrl

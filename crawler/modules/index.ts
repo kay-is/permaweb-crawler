@@ -12,12 +12,12 @@ await CrawlingService.start({
       crawlers: {
         browser: new CrawleePlaywrightCrawlerAdapter(),
       },
-    },
-    utils: {
-      extractor: new NodeHtmlParserExtractorAdapter(),
       resolver: new StaticWayfinderResolverAdapter({
         gatewayUrls: ["https://arweave.net", "https://permagate.io"],
       }),
+    },
+    utils: {
+      extractor: new NodeHtmlParserExtractorAdapter(),
     },
     outputs: {
       storage: new CrawleeDatasetStorageAdapter(),
