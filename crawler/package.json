@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "dev": "tsx modules/index.ts",
     "build:docker": "docker build -t permaweb-crawler .",
-    "start:docker": "docker run -d -p 3000:3000 permaweb-crawler",
+    "start:docker": "docker run -d -p 3000:3000 -v ./storage:/home/myuser/storage permaweb-crawler",
     "dev:docker": "docker run -d -p 3000:3000 -v ./storage:/home/myuser/storage $(docker build -q .)",
     "prune:storage": "rm -rf storage/*"
   },
