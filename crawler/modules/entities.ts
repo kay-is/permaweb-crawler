@@ -1,5 +1,3 @@
-import { error } from "node:console"
-import { finished } from "node:stream"
 import * as v from "valibot"
 
 export const arweaveTxIdSchema = v.pipe(v.string(), v.length(43))
