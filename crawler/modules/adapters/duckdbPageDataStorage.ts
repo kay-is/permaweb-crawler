@@ -31,27 +31,27 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
 
       await duckdb.run(`
         CREATE TABLE IF NOT EXISTS ${detailsTableName} (
-          txId STRING PRIMARY KEY,
+          txId VARCHAR PRIMARY KEY,
 
-          arnsName STRING NOT NULL,
-          wayfinderUrl STRING NOT NULL,
-          gatewayUrl STRING NOT NULL,
-          charset STRING NOT NULL,
-          language STRING,
-          title STRING NOT NULL,
-          description STRING,
+          arnsName VARCHAR NOT NULL,
+          wayfinderUrl VARCHAR NOT NULL,
+          gatewayUrl VARCHAR NOT NULL,
+          charset VARCHAR NOT NULL,
+          language VARCHAR,
+          title VARCHAR NOT NULL,
+          description VARCHAR,
           
-          headers MAP(STRING, STRING),
-          absoluteUrls STRING[],
-          relativeUrls STRING[],
-          openGraph MAP(STRING, STRING),
+          headers MAP(VARCHAR, VARCHAR),
+          absoluteUrls VARCHAR[],
+          relativeUrls VARCHAR[],
+          openGraph MAP(VARCHAR, VARCHAR),
           
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS ${htmlTableName} (
           txId VARCHAR PRIMARY KEY,
-          normalizedHtml TEXT,
+          normalizedHtml VARCHAR,
           
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
