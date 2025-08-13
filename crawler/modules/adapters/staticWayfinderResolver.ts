@@ -1,5 +1,6 @@
 import * as WayfinderCore from "@ar.io/wayfinder-core"
 
+import * as Utils from "../utils.js"
 import type * as Entities from "../entities.js"
 import type * as ArnsResolverPort from "../ports/arnsResolver.js"
 
@@ -15,27 +16,33 @@ export class StaticWayfinderArnsResolverAdapter implements ArnsResolverPort.Arns
       gatewaysProvider: new WayfinderCore.StaticGatewaysProvider({
         gateways: config.gatewayUrls,
       }),
+      logger: {
+        ...console,
+        debug: () => null,
+        info: () => null,
+      },
     })
   }
 
-  async resolve(arnsName: string): Promise<Entities.GatewayUrl>
-  async resolve(url: Entities.WayfinderUrl): Promise<Entities.GatewayUrl>
+  async resolve(urlOrArnsName: Entities.WayfinderUrl | Entities.ArnsName) {
+    return Utils.tryCatch(async () => {
+      const config = urlOrArnsName.startsWith("ar://")
+        ? { wayfinderUrl: urlOrArnsName as Entities.WayfinderUrl }
+        : { arnsName: urlOrArnsName }
 
-  async resolve(url: Entities.WayfinderUrl | Entities.ArnsName): Promise<Entities.GatewayUrl> {
-    const config = url.startsWith("ar://")
-      ? { wayfinderUrl: url as Entities.WayfinderUrl }
-      : { arnsName: url }
-
-    const resolvedUrl = await this.#wayfinder.resolveUrl(config)
-    return resolvedUrl.toString() as Entities.GatewayUrl
+      const resolvedUrl = await this.#wayfinder.resolveUrl(config)
+      return resolvedUrl.toString() as Entities.GatewayUrl
+    })
   }
 
-  async dissolve(url: Entities.GatewayUrl | URL): Promise<Entities.WayfinderUrl> {
-    const wayfinderUrl = new URL(url)
-    wayfinderUrl.hostname = wayfinderUrl.hostname.split(".").shift() as string
-    return wayfinderUrl
-      .toString()
-      .replace("http:", "ar:")
-      .replace("https:", "ar:") as Entities.WayfinderUrl
+  async dissolve(url: Entities.GatewayUrl | URL) {
+    return Utils.tryCatch(async () => {
+      const wayfinderUrl = new URL(url)
+      wayfinderUrl.hostname = wayfinderUrl.hostname.split(".").shift() as string
+      return wayfinderUrl
+        .toString()
+        .replace("http:", "ar:")
+        .replace("https:", "ar:") as Entities.WayfinderUrl
+    })
   }
 }

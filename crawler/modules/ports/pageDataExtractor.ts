@@ -1,5 +1,6 @@
-import type { HtmlData } from "../entities.js"
+import type * as Utils from "../utils.js"
+import type * as Entities from "../entities.js"
 
 export interface PageDataExtractorUtil {
-  extract(html: string): Promise<HtmlData>
+  extract(html: string): Utils.PromisedResult<Entities.HtmlData>
 }

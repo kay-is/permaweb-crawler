@@ -1,31 +1,35 @@
 import http from "node:http"
 
-import type { WebServerConfig, WebServerOutput } from "../ports/webServer.js"
+import * as Utils from "../utils.js"
+import * as WebServerPort from "../ports/webServer.js"
 
-export class NodeHttpWebServerAdapter implements WebServerOutput {
-  start(config: WebServerConfig): Promise<void> {
-    const server = http.createServer(config.requestHandler)
+export class NodeHttpWebServerAdapter implements WebServerPort.WebServerOutput {
+  async start(config: WebServerPort.WebServerConfig) {
+    return Utils.tryCatch(async () => {
+      const server = http.createServer(config.requestHandler)
 
-    return new Promise<void>((resolve, reject) => {
-      server.on("listening", () => {
-        console.info(`[NodeHttpWebServer] Server running at http://localhost:${config.port}/`)
-        resolve()
-        ;["SIGINT", "SIGTERM"].forEach((signal) => {
-          process.on(signal, async () => {
-            console.log(`\nReceived ${signal}, shutting down...`)
+      return new Promise<Utils.EmptyResult>((resolve, reject) => {
+        server.on("listening", () => {
+          Array("SIGINT", "SIGTERM").forEach((signal) => {
+            process.on(signal, async () => {
+              console.info(`\nReceived ${signal}, shutting down...`)
 
-            await new Promise((r) => server.close(r))
+              await new Promise((r) => server.close(r))
 
-            console.log("Shutdown complete")
-            process.exit(0)
+              console.info("Shutdown complete")
+              process.exit(0)
+            })
           })
+
+          resolve(Utils.empty())
         })
+
+        try {
+          server.listen(config.port)
+        } catch (error: any) {
+          reject(Utils.error(error))
+        }
       })
-      try {
-        server.listen(config.port)
-      } catch (e) {
-        reject(e)
-      }
     })
   }
 }

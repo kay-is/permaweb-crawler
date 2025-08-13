@@ -9,7 +9,7 @@ import { CrawlingService } from "./service.js"
 await CrawlingService.start({
   adapters: {
     inputs: {
-      apiServer: new TrpcApiServerAdapter({ port: 3000 }),
+      apiServer: new TrpcApiServerAdapter(),
       crawlers: {
         browser: new CrawleePlaywrightCrawlerAdapter(),
       },

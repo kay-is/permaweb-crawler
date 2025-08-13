@@ -1,6 +1,7 @@
 import * as TrpcServer from "@trpc/server"
 import * as TrpcServerAdapter from "@trpc/server/adapters/standalone"
 
+import * as Utils from "../utils.js"
 import * as Entities from "../entities.js"
 import type * as ApiServerPort from "../ports/apiServer.js"
 
@@ -25,10 +26,11 @@ export class TrpcApiServerAdapter implements ApiServerPort.ApiServerInput {
     return this.#appRouter
   }
 
-  constructor() {}
-
   async start(config: ApiServerPort.ApiServerConfig) {
     this.#createTaskHandler = config.handlers.createTask
-    return TrpcServerAdapter.createHTTPHandler({ router: this.#appRouter })
+
+    return Utils.tryCatch(async () =>
+      TrpcServerAdapter.createHTTPHandler({ router: this.#appRouter }),
+    )
   }
 }

@@ -1,7 +1,11 @@
-import type { RequestListener } from "node:http"
-import type { CrawlTaskConfig, CrawlTask } from "../entities.js"
+import http from "node:http"
 
-export type CreateTaskHandler = (taskDefinition: CrawlTaskConfig) => Promise<CrawlTask>
+import * as Utils from "../utils.js"
+import * as Entities from "../entities.js"
+
+export type CreateTaskHandler = (
+  taskDefinition: Entities.CrawlTaskConfig,
+) => Promise<Entities.CrawlTask>
 
 export type ApiServerConfig = {
   handlers: {
@@ -9,8 +13,8 @@ export type ApiServerConfig = {
   }
 }
 
-export type ApiServerHandler = RequestListener
+export type ApiServerHandler = http.RequestListener
 
 export interface ApiServerInput {
-  start(handlers: ApiServerConfig): Promise<ApiServerHandler>
+  start(handlers: ApiServerConfig): Promise<Utils.Result<ApiServerHandler>>
 }

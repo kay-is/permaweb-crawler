@@ -1,50 +1,52 @@
 import * as NodeHtmlParser from "node-html-parser"
 
-import type * as Entities from "../entities.js"
+import * as Utils from "../utils.js"
 import type * as PageDataExtractorPort from "../ports/pageDataExtractor.js"
 
 export class NodeHtmlParserExtractorAdapter implements PageDataExtractorPort.PageDataExtractorUtil {
-  async extract(html: string): Promise<Entities.HtmlData> {
-    const document = NodeHtmlParser.parse(html)
+  async extract(html: string) {
+    return Utils.tryCatch(() => {
+      const document = NodeHtmlParser.parse(html)
 
-    // Normalize HTML
-    document.querySelectorAll("style").forEach((element) => element.remove())
-    document.querySelectorAll("script").forEach((element) => element.remove())
-    document.querySelectorAll("[style]").forEach((element) => element.removeAttribute("style"))
-    document.querySelectorAll("[class]").forEach((element) => element.removeAttribute("class"))
-    document.querySelectorAll("img").forEach((element) => {
-      const srcUrl = element.getAttribute("src") ?? ""
-      if (srcUrl.startsWith("data:")) element.removeAttribute("src")
-    })
-    document.querySelectorAll("svg").forEach((element) => (element.innerHTML = ""))
-    const normalizedHtml = document.toString().replace(/>\s+</g, "><")
-
-    // Extract content
-    const title = document.querySelector("title")?.innerText ?? ""
-    const description =
-      document.querySelector("meta[name=description]")?.getAttribute("content")?.trim() ?? ""
-    const charset = document.querySelector("meta[charset]")?.getAttribute("charset") ?? ""
-    const language = document.querySelector("html")?.getAttribute("lang") ?? ""
-    const openGraph = document
-      .querySelectorAll("meta[property]")
-      .filter((element) => element.getAttribute("property")?.startsWith("og:"))
-      .map((tag) => {
-        const property = tag.getAttribute("property")
-        const content = tag.getAttribute("content")
-
-        if (property && content) return { property, content }
-
-        return null
+      // Normalize HTML
+      document.querySelectorAll("style").forEach((element) => element.remove())
+      document.querySelectorAll("script").forEach((element) => element.remove())
+      document.querySelectorAll("[style]").forEach((element) => element.removeAttribute("style"))
+      document.querySelectorAll("[class]").forEach((element) => element.removeAttribute("class"))
+      document.querySelectorAll("img").forEach((element) => {
+        const srcUrl = element.getAttribute("src") ?? ""
+        if (srcUrl.startsWith("data:")) element.removeAttribute("src")
       })
-      .filter((tag) => !!tag)
+      document.querySelectorAll("svg").forEach((element) => (element.innerHTML = ""))
+      const normalizedHtml = document.toString().replace(/>\s+</g, "><")
 
-    return {
-      charset,
-      language,
-      title,
-      description,
-      openGraph,
-      normalizedHtml,
-    }
+      // Extract content
+      const title = document.querySelector("title")?.innerText ?? ""
+      const description =
+        document.querySelector("meta[name=description]")?.getAttribute("content")?.trim() ?? ""
+      const charset = document.querySelector("meta[charset]")?.getAttribute("charset") ?? ""
+      const language = document.querySelector("html")?.getAttribute("lang") ?? ""
+      const openGraph = document
+        .querySelectorAll("meta[property]")
+        .filter((element) => element.getAttribute("property")?.startsWith("og:"))
+        .map((tag) => {
+          const property = tag.getAttribute("property")
+          const content = tag.getAttribute("content")
+
+          if (property && content) return { property, content }
+
+          return null
+        })
+        .filter((tag) => !!tag)
+
+      return {
+        charset,
+        language,
+        title,
+        description,
+        openGraph,
+        normalizedHtml,
+      }
+    })
   }
 }

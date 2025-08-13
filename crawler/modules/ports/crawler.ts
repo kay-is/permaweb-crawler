@@ -1,3 +1,4 @@
+import type * as Utils from "../utils.js"
 import type * as Entities from "../entities.js"
 
 export type CrawlerRequest = {
@@ -26,11 +27,13 @@ export type CrawlerErrorHandlerData = {
   errorMessages: string[]
 }
 
-export type CrawlerPageDataHandler = (pageData: CrawlerPageData) => Promise<void>
-export type CrawlerScrapingErrorHandler = (errorData: CrawlerErrorHandlerData) => Promise<string>
+export type CrawlerPageDataHandler = (pageData: CrawlerPageData) => Utils.PromisedEmptyResult
+export type CrawlerScrapingErrorHandler = (
+  errorData: CrawlerErrorHandlerData,
+) => Utils.PromisedResult<string>
 export type CrawlerResolveUrlHandler = (
   gatewayUrl: Entities.GatewayUrl,
-) => Promise<{ gatewayUrl: Entities.GatewayUrl; wayfinderUrl: Entities.WayfinderUrl }>
+) => Utils.PromisedResult<{ gatewayUrl: Entities.GatewayUrl; wayfinderUrl: Entities.WayfinderUrl }>
 
 export type CrawlerConfig = {
   taskId: string
@@ -42,5 +45,5 @@ export type CrawlerConfig = {
 }
 
 export interface CrawlerInput {
-  start(config: CrawlerConfig): Promise<void>
+  start(config: CrawlerConfig): Utils.PromisedEmptyResult
 }
