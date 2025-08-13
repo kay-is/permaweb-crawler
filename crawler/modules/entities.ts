@@ -12,7 +12,7 @@ export type WayfinderUrl = `ar://${string}`
 export const gatewayUrlSchema = v.pipe(
   v.string(),
   v.trim(),
-  v.regex(/^(https:\/\/)((?:[a-zA-Z0-9-]+\.){2,}[a-zA-Z]{2,})($|[/?#].*)$/i),
+  v.regex(/^(https:\/\/)((?:[a-zA-Z0-9_-]+\.){2,}[a-zA-Z]{2,})($|[/?#].*)$/i),
 )
 export type GatewayUrl = `https://${string}.${string}`
 
