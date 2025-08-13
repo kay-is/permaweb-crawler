@@ -1,10 +1,10 @@
 import http from "node:http"
 
 import * as Utils from "../utils.js"
-import * as WebServerPort from "../ports/webServer.js"
+import * as WebServer from "../ports/webServer.js"
 
-export class NodeHttpWebServerAdapter implements WebServerPort.WebServerOutput {
-  async start(config: WebServerPort.WebServerConfig) {
+export default class NodeHttpWebServer implements WebServer.WebServerOutput {
+  async start(config: WebServer.WebServerConfig) {
     return Utils.tryCatch(async () => {
       const server = http.createServer(config.requestHandler)
 

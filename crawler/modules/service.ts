@@ -4,38 +4,38 @@ import http from "node:http"
 
 import * as Utils from "./utils.js"
 import type * as Entities from "./entities.js"
-import type * as ApiServerPort from "./ports/apiServer.js"
-import type * as CrawlerPort from "./ports/crawler.js"
-import type * as PageDataExtractorPort from "./ports/pageDataExtractor.js"
-import type * as ArnsResolverPort from "./ports/arnsResolver.js"
-import type * as ResultStoragePort from "./ports/pageDataStorage.js"
-import type * as WebServerPort from "./ports/webServer.js"
+import type * as ApiServer from "./ports/apiServer.js"
+import type * as Crawler from "./ports/crawler.js"
+import type * as PageDataExtractor from "./ports/pageDataExtractor.js"
+import type * as ArnsResolver from "./ports/arnsResolver.js"
+import type * as PageDataStorage from "./ports/pageDataStorage.js"
+import type * as WebServer from "./ports/webServer.js"
 
 export interface CrawlingServiceConfig {
   adapters: {
     inputs: {
-      apiServer: ApiServerPort.ApiServerInput
-      crawlers: Record<Entities.CrawlerTypes, CrawlerPort.CrawlerInput>
-      arnsResolver: ArnsResolverPort.ArnsResolverInput
+      apiServer: ApiServer.ApiServerInput
+      crawlers: Record<Entities.CrawlerTypes, Crawler.CrawlerInput>
+      arnsResolver: ArnsResolver.ArnsResolverInput
     }
     utils: {
-      pageDataExtractor: PageDataExtractorPort.PageDataExtractorUtil
+      pageDataExtractor: PageDataExtractor.PageDataExtractorUtil
     }
     outputs: {
-      resultStorage: ResultStoragePort.PageDataStorageOutput
-      webServer: WebServerPort.WebServerOutput
+      resultStorage: PageDataStorage.PageDataStorageOutput
+      webServer: WebServer.WebServerOutput
     }
   }
 }
 
-export class CrawlingService {
+export default class CrawlingService {
   #tasks: Record<string, Entities.CrawlTask> = {}
   #inputs: CrawlingServiceConfig["adapters"]["inputs"]
   #utils: CrawlingServiceConfig["adapters"]["utils"]
   #outputs: CrawlingServiceConfig["adapters"]["outputs"]
 
-  #apiServerHandler?: ApiServerPort.ApiServerHandler
-  #stores: Record<string, ResultStoragePort.PageDataStore> = {}
+  #apiServerHandler?: ApiServer.ApiServerHandler
+  #stores: Record<string, PageDataStorage.PageDataStore> = {}
 
   static async start(config: CrawlingServiceConfig) {
     return new CrawlingService(config).start()
@@ -106,7 +106,7 @@ export class CrawlingService {
       const store = openStore.data
       this.#stores[task.id] = store
 
-      let initialRequests: CrawlerPort.CrawlerRequest[] = []
+      let initialRequests: Crawler.CrawlerRequest[] = []
       for (const arnsName of taskConfig.arnsNames) {
         const gatewayUrl = await this.#inputs.arnsResolver.resolve(arnsName)
 
@@ -156,7 +156,7 @@ export class CrawlingService {
   }
 
   // called by CrawlerPort for every crawled page
-  async #pageDataHandler(pageData: CrawlerPort.CrawlerPageData) {
+  async #pageDataHandler(pageData: Crawler.CrawlerPageData) {
     console.info(`[CrawlingService.#inputs.crawler] Scraping ${pageData.wayfinderUrl}`)
     const extractingHtmlData = await this.#utils.pageDataExtractor.extract(pageData.html)
 
@@ -209,7 +209,7 @@ export class CrawlingService {
   }
 
   // called by CrawlerPort in the case of scraping issues
-  async #scrapingErrorHandler(input: CrawlerPort.CrawlerErrorHandlerData) {
+  async #scrapingErrorHandler(input: Crawler.CrawlerErrorHandlerData) {
     const wayfinderUrl = await this.#inputs.arnsResolver.dissolve(input.failedUrl)
 
     if (wayfinderUrl.failed) return Utils.error(wayfinderUrl.error)

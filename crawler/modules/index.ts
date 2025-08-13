@@ -1,19 +1,19 @@
-import { CrawleePlaywrightCrawlerAdapter } from "./adapters/crawleePlaywrightCrawler.js"
-import { NodeHtmlParserExtractorAdapter } from "./adapters/nodeHtmlParserExtractor.js"
-import { TrpcApiServerAdapter } from "./adapters/trpcApiServer.js"
-import { StaticWayfinderArnsResolverAdapter } from "./adapters/staticWayfinderResolver.js"
-import { DuckdbStorageAdapter } from "./adapters/duckdbStorage.js"
-import { NodeHttpWebServerAdapter } from "./adapters/nodeHttpWebServer.js"
-import { CrawlingService } from "./service.js"
+import CrawleePlaywrightCrawler from "./adapters/crawleePlaywrightCrawler.js"
+import NodeHtmlParserExtractor from "./adapters/nodeHtmlParserExtractor.js"
+import TrpcApiServer from "./adapters/trpcApiServer.js"
+import StaticWayfinderArnsResolver from "./adapters/staticWayfinderArnsResolver.js"
+import DuckdbResultStorage from "./adapters/duckdbResultStorage.js"
+import NodeHttpWebServer from "./adapters/nodeHttpWebServer.js"
+import CrawlingService from "./service.js"
 
 await CrawlingService.start({
   adapters: {
     inputs: {
-      apiServer: new TrpcApiServerAdapter(),
+      apiServer: new TrpcApiServer(),
       crawlers: {
-        browser: new CrawleePlaywrightCrawlerAdapter(),
+        browser: new CrawleePlaywrightCrawler(),
       },
-      arnsResolver: new StaticWayfinderArnsResolverAdapter({
+      arnsResolver: new StaticWayfinderArnsResolver({
         gatewayUrls: [
           "https://ar-io-gateway.svc.blacksand.xyz",
           "https://permagate.io",
@@ -23,11 +23,11 @@ await CrawlingService.start({
       }),
     },
     utils: {
-      pageDataExtractor: new NodeHtmlParserExtractorAdapter(),
+      pageDataExtractor: new NodeHtmlParserExtractor(),
     },
     outputs: {
-      resultStorage: new DuckdbStorageAdapter(),
-      webServer: new NodeHttpWebServerAdapter(),
+      resultStorage: new DuckdbResultStorage(),
+      webServer: new NodeHttpWebServer(),
     },
   },
 })

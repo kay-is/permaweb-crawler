@@ -1,9 +1,9 @@
 import * as NodeHtmlParser from "node-html-parser"
 
 import * as Utils from "../utils.js"
-import type * as PageDataExtractorPort from "../ports/pageDataExtractor.js"
+import type * as PageDataExtractor from "../ports/pageDataExtractor.js"
 
-export class NodeHtmlParserExtractorAdapter implements PageDataExtractorPort.PageDataExtractorUtil {
+export default class NodeHtmlParserExtractor implements PageDataExtractor.PageDataExtractorUtil {
   async extract(html: string) {
     return Utils.tryCatch(() => {
       const document = NodeHtmlParser.parse(html)

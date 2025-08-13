@@ -2,13 +2,13 @@ import * as WayfinderCore from "@ar.io/wayfinder-core"
 
 import * as Utils from "../utils.js"
 import type * as Entities from "../entities.js"
-import type * as ArnsResolverPort from "../ports/arnsResolver.js"
+import type * as ArnsResolver from "../ports/arnsResolver.js"
 
 export type StaticWayfinderArnsResolverAdapterConfig = {
   gatewayUrls: `https://${string}`[]
 }
 
-export class StaticWayfinderArnsResolverAdapter implements ArnsResolverPort.ArnsResolverInput {
+export default class StaticWayfinderArnsResolver implements ArnsResolver.ArnsResolverInput {
   #wayfinder: WayfinderCore.Wayfinder
 
   constructor(config: StaticWayfinderArnsResolverAdapterConfig) {

@@ -4,16 +4,16 @@ import * as Playwright from "playwright-core"
 
 import * as Utils from "../utils.js"
 import * as Entities from "../entities.js"
-import type * as CrawlerPort from "../ports/crawler.js"
+import type * as Crawler from "../ports/crawler.js"
 
-export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput {
+export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   #taskId?: string
   #extractHashUrls?: boolean
 
-  #pageDataHandler?: CrawlerPort.CrawlerPageDataHandler
-  #scrapingErrorHandler?: CrawlerPort.CrawlerScrapingErrorHandler
+  #pageDataHandler?: Crawler.CrawlerPageDataHandler
+  #scrapingErrorHandler?: Crawler.CrawlerScrapingErrorHandler
 
-  async start(config: CrawlerPort.CrawlerConfig) {
+  async start(config: Crawler.CrawlerConfig) {
     return Utils.tryCatch(async () => {
       this.#taskId = config.taskId
       this.#extractHashUrls = config.extractHashUrls
