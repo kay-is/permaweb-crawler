@@ -1,26 +1,33 @@
 import { CrawleePlaywrightCrawlerAdapter } from "./adapters/crawleePlaywrightCrawler.js"
-import { CrawleeDatasetStorageAdapter } from "./adapters/crawleeDatasetStorage.js"
 import { NodeHtmlParserExtractorAdapter } from "./adapters/nodeHtmlParserExtractor.js"
-import { TrpcApiAdapter } from "./adapters/trpcApi.js"
-import { StaticWayfinderResolverAdapter } from "./adapters/staticWayfinderResolver.js"
+import { TrpcApiServerAdapter } from "./adapters/trpcApiServer.js"
+import { StaticWayfinderArnsResolverAdapter } from "./adapters/staticWayfinderResolver.js"
+import { DuckdbStorageAdapter } from "./adapters/duckdbStorage.js"
+import { NodeHttpWebServerAdapter } from "./adapters/nodeHttpWebServer.js"
 import { CrawlingService } from "./service.js"
 
 await CrawlingService.start({
   adapters: {
     inputs: {
-      api: new TrpcApiAdapter({ port: 3000 }),
+      apiServer: new TrpcApiServerAdapter({ port: 3000 }),
       crawlers: {
         browser: new CrawleePlaywrightCrawlerAdapter(),
       },
-      resolver: new StaticWayfinderResolverAdapter({
-        gatewayUrls: ["https://arweave.net", "https://permagate.io"],
+      arnsResolver: new StaticWayfinderArnsResolverAdapter({
+        gatewayUrls: [
+          "https://ar-io-gateway.svc.blacksand.xyz",
+          "https://permagate.io",
+          "https://ario.ionode.top",
+          "https://zigza.xyz",
+        ],
       }),
     },
     utils: {
-      extractor: new NodeHtmlParserExtractorAdapter(),
+      pageDataExtractor: new NodeHtmlParserExtractorAdapter(),
     },
     outputs: {
-      storage: new CrawleeDatasetStorageAdapter(),
+      resultStorage: new DuckdbStorageAdapter(),
+      webServer: new NodeHttpWebServerAdapter(),
     },
   },
 })

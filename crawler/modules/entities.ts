@@ -1,3 +1,5 @@
+import { error } from "node:console"
+import { finished } from "node:stream"
 import * as v from "valibot"
 
 export const arweaveTxIdSchema = v.pipe(v.string(), v.length(43))
@@ -24,10 +26,14 @@ export const crawlTaskSchema = v.object({
   arnsNames: v.array(arnsNameSchema),
   executeJavaScript: v.boolean(),
   extractHashUrls: v.boolean(),
+  pageCount: v.number(),
+  createdAt: v.number(),
+  finishedAt: v.optional(v.number()),
+  error: v.optional(v.string()),
 })
 export type CrawlTask = v.InferInput<typeof crawlTaskSchema>
 
-export const crawlTaskConfigSchema = v.omit(crawlTaskSchema, ["id"])
+export const crawlTaskConfigSchema = v.omit(crawlTaskSchema, ["id", "pageCount", "createdAt"])
 export type CrawlTaskConfig = v.InferInput<typeof crawlTaskConfigSchema>
 
 export const htmlDataSchema = v.object({
@@ -49,6 +55,7 @@ export type HtmlData = v.InferInput<typeof htmlDataSchema>
 export const pageDataSchema = v.object({
   ...htmlDataSchema.entries,
   txId: arweaveTxIdSchema,
+  arnsName: arnsNameSchema,
   wayfinderUrl: wayfinderUrlSchema,
   gatewayUrl: gatewayUrlSchema,
   headers: v.array(

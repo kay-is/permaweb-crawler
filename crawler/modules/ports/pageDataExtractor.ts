@@ -1,5 +1,5 @@
 import type { HtmlData } from "../entities.js"
 
-export interface ExtractorUtil {
+export interface PageDataExtractorUtil {
   extract(html: string): Promise<HtmlData>
 }

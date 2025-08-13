@@ -9,8 +9,8 @@ export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput
   #taskId?: string
   #extractHashUrls?: boolean
 
-  #pageDataHandler?: CrawlerPort.PageDataHandler
-  #scrapingErrorHandler?: CrawlerPort.ScrapingErrorHandler
+  #pageDataHandler?: CrawlerPort.CrawlerPageDataHandler
+  #scrapingErrorHandler?: CrawlerPort.CrawlerScrapingErrorHandler
 
   async start(config: CrawlerPort.CrawlerConfig) {
     this.#taskId = config.taskId
@@ -54,6 +54,7 @@ export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput
     this.#scrapingErrorHandler = config.scrapingErrorHandler
 
     const crawler = new Crawlee.PlaywrightCrawler({
+      maxConcurrency: 10,
       requestQueue,
       launchContext: { launcher: Playwright.chromium },
       requestHandler: this.#playwrightRequestHandler.bind(this),
@@ -67,8 +68,6 @@ export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput
         uniqueKey: wayfinderUrl,
       })),
     )
-
-    process.exit(0)
   }
 
   async #playwrightRequestHandler(context: Crawlee.PlaywrightCrawlingContext) {
@@ -91,11 +90,12 @@ export class CrawleePlaywrightCrawlerAdapter implements CrawlerPort.CrawlerInput
 
     // requires a locator() call for client-side rendered pages
     const html = await context.page.content()
-    const headers = (await context.response?.headers()) ?? {}
+    const headers = (await context.response?.allHeaders()) ?? {}
     const headersArray = Object.entries(headers).map(([name, value]) => ({ name, value }))
 
     await this.#pageDataHandler({
       taskId: this.#taskId,
+      arnsName: context.request.uniqueKey.split("/")[2] ?? "",
       wayfinderUrl: context.request.uniqueKey as Entities.WayfinderUrl,
       gatewayUrl: context.request.url as Entities.GatewayUrl,
       html,

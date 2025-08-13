@@ -1,9 +1,9 @@
 import * as NodeHtmlParser from "node-html-parser"
 
 import type * as Entities from "../entities.js"
-import type * as ExtractorPort from "../ports/extractor.js"
+import type * as PageDataExtractorPort from "../ports/pageDataExtractor.js"
 
-export class NodeHtmlParserExtractorAdapter implements ExtractorPort.ExtractorUtil {
+export class NodeHtmlParserExtractorAdapter implements PageDataExtractorPort.PageDataExtractorUtil {
   async extract(html: string): Promise<Entities.HtmlData> {
     const document = NodeHtmlParser.parse(html)
 

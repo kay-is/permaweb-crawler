@@ -7,6 +7,7 @@ export type CrawlerRequest = {
 
 export type CrawlerPageData = {
   taskId: string
+  arnsName: string
   wayfinderUrl: Entities.WayfinderUrl
   gatewayUrl: Entities.GatewayUrl
   headers: { name: string; value: string }[]
@@ -25,17 +26,19 @@ export type CrawlerErrorHandlerData = {
   errorMessages: string[]
 }
 
-export type PageDataHandler = (pageData: CrawlerPageData) => Promise<void>
-export type ScrapingErrorHandler = (errorData: CrawlerErrorHandlerData) => Promise<string>
-export type ResolveUrlHandler = (gatewayUrl: Entities.GatewayUrl) => Promise<{gatewayUrl: Entities.GatewayUrl, wayfinderUrl: Entities.WayfinderUrl}>
+export type CrawlerPageDataHandler = (pageData: CrawlerPageData) => Promise<void>
+export type CrawlerScrapingErrorHandler = (errorData: CrawlerErrorHandlerData) => Promise<string>
+export type CrawlerResolveUrlHandler = (
+  gatewayUrl: Entities.GatewayUrl,
+) => Promise<{ gatewayUrl: Entities.GatewayUrl; wayfinderUrl: Entities.WayfinderUrl }>
 
 export type CrawlerConfig = {
   taskId: string
   initialRequests: CrawlerRequest[]
   extractHashUrls: boolean
-  pageDataHandler: PageDataHandler
-  scrapingErrorHandler: ScrapingErrorHandler
-  resolveUrlHandler: ResolveUrlHandler
+  pageDataHandler: CrawlerPageDataHandler
+  scrapingErrorHandler: CrawlerScrapingErrorHandler
+  resolveUrlHandler: CrawlerResolveUrlHandler
 }
 
 export interface CrawlerInput {
