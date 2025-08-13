@@ -12,4 +12,4 @@ EXPOSE 3000
 
 USER root
 
-CMD ["node", "./dist/index.js"]
+CMD ["npm", "start"]

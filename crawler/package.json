@@ -4,12 +4,13 @@
   "version": "0.0.12",
   "type": "module",
   "scripts": {
-    "dev": "tsx modules/index.ts",
-    "start": "node dist/index.js",
     "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx modules/index.ts",
     "build:docker": "docker build -t permaweb-crawler .",
     "start:docker": "docker run -d -p 3000:3000 permaweb-crawler",
-    "dev:docker": "docker run -d -p 3000:3000 -v ./storage:/home/myuser/storage $(docker build -q .)"
+    "dev:docker": "docker run -d -p 3000:3000 -v ./storage:/home/myuser/storage $(docker build -q .)",
+    "prune:storage": "rm -rf storage/*"
   },
   "author": "Kay Plößer",
   "license": "AGPL-3.0-only",
