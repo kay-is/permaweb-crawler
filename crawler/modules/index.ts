@@ -2,7 +2,7 @@ import CrawleePlaywrightCrawler from "./adapters/crawleePlaywrightCrawler.js"
 import NodeHtmlParserExtractor from "./adapters/nodeHtmlParserExtractor.js"
 import TrpcApiServer from "./adapters/trpcApiServer.js"
 import StaticWayfinderArnsResolver from "./adapters/staticWayfinderArnsResolver.js"
-import DuckdbResultStorage from "./adapters/duckdbResultStorage.js"
+import DuckdbPageDataStorage from "./adapters/duckdbPageDataStorage.js"
 import NodeHttpWebServer from "./adapters/nodeHttpWebServer.js"
 import CrawlingService from "./service.js"
 
@@ -26,7 +26,7 @@ await CrawlingService.start({
       pageDataExtractor: new NodeHtmlParserExtractor(),
     },
     outputs: {
-      resultStorage: new DuckdbResultStorage(),
+      resultStorage: new DuckdbPageDataStorage(),
       webServer: new NodeHttpWebServer(),
     },
   },

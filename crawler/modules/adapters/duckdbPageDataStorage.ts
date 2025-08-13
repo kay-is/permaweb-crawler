@@ -4,7 +4,7 @@ import * as Duckdb from "@duckdb/node-api"
 
 import * as Utils from "../utils.js"
 import * as Entities from "../entities.js"
-import * as ResultStorage from "../ports/pageDataStorage.js"
+import * as PageDataStorage from "../ports/pageDataStorage.js"
 
 const STORAGE_PATH = path.resolve("storage")
 const DATABASE_PATH = path.join(STORAGE_PATH, "duckdb")
@@ -17,7 +17,7 @@ const nullOrMap = <Item>(
 
 const nullOrList = (iterable: string[]) => (iterable.length < 1 ? null : Duckdb.listValue(iterable))
 
-export default class DuckdbResultStorage implements ResultStorage.PageDataStorageOutput {
+export default class DuckdbPageDataStorage implements PageDataStorage.PageDataStorageOutput {
   async open(storageId: string) {
     return Utils.tryCatch(async () => {
       await fs.mkdir(DATABASE_PATH, { recursive: true })
