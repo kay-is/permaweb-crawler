@@ -189,7 +189,6 @@ export default class CrawlingService {
     const checkingDuplicate = await pageDuplicateStore.check(htmlWithoutTags)
     if (checkingDuplicate.failed) return Utils.error(checkingDuplicate.error)
     if (checkingDuplicate.data) {
-      console.debug("Duplicate", pageData.wayfinderUrl)
       task.duplicateCount++
       return Utils.empty()
     }
@@ -220,10 +219,8 @@ export default class CrawlingService {
       ),
     })
 
-    if (storingPageData.failed && !storingPageData.error.message.includes("Duplicate")) {
-      // causes the crawler to retry the URL
-      return Utils.error(storingPageData.error)
-    }
+    // causes the crawler to retry the URL
+    if (storingPageData.failed) return Utils.error(storingPageData.error)
 
     console.debug("[CrawlingService.#inputs.crawler] Page data stored:", pageData.wayfinderUrl)
     task.pageCount++

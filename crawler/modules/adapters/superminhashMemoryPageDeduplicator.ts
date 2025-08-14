@@ -30,7 +30,6 @@ export default class SuperminhashMemoryPageDeduplicator
           let similarity = newHash.similarity(storedHash)
           if (similarity >= similarityThreshold) {
             found = true
-            console.debug(`Duplicate with ${similarity} similarity found`)
             break
           }
         }
