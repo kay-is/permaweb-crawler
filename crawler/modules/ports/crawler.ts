@@ -22,8 +22,10 @@ export type CrawlerScrapingHandlerOutput = {
 }
 
 export type CrawlerErrorHandlerData = {
+  taskId: string
   failedUrl: Entities.GatewayUrl
   retryCount: number
+  maxRetries: number
   errorMessages: string[]
 }
 
