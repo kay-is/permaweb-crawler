@@ -2,9 +2,11 @@ import { FsTaskConfigStorageAdapter } from "./adapters/fsTaskConfigStorage.js"
 import { TrpcWorkerClientAdapter } from "./adapters/trpcWorkerClient.js"
 import { ClientService } from "./clientService.js"
 
+const taskName = process.argv[2] || "docs"
+
 console.info("Starting client...")
 const taskId = await ClientService.start({
-  taskId: "arwiki",
+  taskId: taskName,
   adapters: {
     inputs: {
       taskConfigStore: new FsTaskConfigStorageAdapter("fixtures"),
