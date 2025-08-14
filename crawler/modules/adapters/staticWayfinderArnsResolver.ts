@@ -12,6 +12,16 @@ export default class StaticWayfinderArnsResolver implements ArnsResolver.ArnsRes
   #wayfinder: WayfinderCore.Wayfinder
 
   constructor(config: StaticWayfinderArnsResolverAdapterConfig) {
+    console.info({
+      time: new Date(),
+      level: "info",
+      source: "StaticWayfinderArnsResolver",
+      message: "initializing",
+      context: {
+        providers: ["StaticGatewaysProvider"],
+        gateways: config.gatewayUrls,
+      },
+    })
     this.#wayfinder = new WayfinderCore.Wayfinder({
       gatewaysProvider: new WayfinderCore.StaticGatewaysProvider({
         gateways: config.gatewayUrls,

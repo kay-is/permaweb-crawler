@@ -6,6 +6,7 @@ import DuckdbPageDataStorage from "./adapters/duckdbPageDataStorage.js"
 import SuperminhashMemoryPageDeduplicator from "./adapters/superminhashMemoryPageDeduplicator.js"
 import NodeHttpWebServer from "./adapters/nodeHttpWebServer.js"
 import CrawlingService from "./service.js"
+import NetworkWayfinderArnsResolver from "./adapters/networkWayfinderArnsResolver.js"
 
 await CrawlingService.start({
   adapters: {
@@ -14,9 +15,7 @@ await CrawlingService.start({
       crawlers: {
         browser: new CrawleePlaywrightCrawler(),
       },
-      arnsResolver: new StaticWayfinderArnsResolver({
-        gatewayUrls: ["https://ar-io-gateway.svc.blacksand.xyz", "https://permagate.io"],
-      }),
+      arnsResolver: new NetworkWayfinderArnsResolver(),
     },
     utils: {
       pageDataExtractor: new NodeHtmlParserExtractor(),
