@@ -12,6 +12,17 @@ export default class SuperminhashMemoryPageDeduplicator
   #stores: Record<string, superminhash.SuperMinHash[]> = {}
 
   async open(storageId: string, similarityThreshold: number) {
+    console.info({
+      time: new Date(),
+      level: "info",
+      source: "SuperminhashMemoryPageDeduplicator",
+      message: "initializing",
+      context: {
+        storageId,
+        similarityThreshold,
+      },
+    })
+
     const hashStore = this.#stores[storageId] || []
     this.#stores[storageId] = hashStore
 
@@ -25,17 +36,18 @@ export default class SuperminhashMemoryPageDeduplicator
 
         newHash.add(tokens)
 
-        let found = false
+        let isDuplicate = false
+        let similarity = 0
         for (const storedHash of hashStore) {
-          let similarity = newHash.similarity(storedHash)
+          similarity = newHash.similarity(storedHash)
           if (similarity >= similarityThreshold) {
-            found = true
+            isDuplicate = true
             break
           }
         }
 
         hashStore.push(newHash)
-        return Utils.ok(found)
+        return Utils.ok({ isDuplicate, similarity })
       },
     })
   }

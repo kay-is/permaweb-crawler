@@ -6,7 +6,7 @@ import * as Utils from "../utils.js"
 import * as Entities from "../entities.js"
 import type * as Crawler from "../ports/crawler.js"
 
-Crawlee.log.setLevel(Crawlee.LogLevel.WARNING)
+Crawlee.log.setLevel(Crawlee.LogLevel.SOFT_FAIL)
 
 export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   #taskId?: string
@@ -17,6 +17,14 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
 
   async start(config: Crawler.CrawlerConfig) {
     return Utils.tryCatch(async () => {
+      console.info({
+        time: new Date(),
+        level: "info",
+        source: "CrawleePlaywrightCrawler",
+        message: "starting",
+        context: config,
+      })
+
       this.#taskId = config.taskId
       this.#extractHashUrls = config.extractHashUrls
 
@@ -40,14 +48,33 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
             | Entities.GatewayUrl
             | undefined
           if (!validUrl) {
-            console.warn(`[CrawleePlaywrightCrawler] Invalid gateway URL: ${oldGatewayUrl}`)
+            console.warn({
+              time: new Date(),
+              level: "warning",
+              source: "CrawleePlaywrightCrawler",
+              message: "Invalid URL",
+              context: {
+                taskId: this.#taskId,
+                gatewayUrl: oldGatewayUrl,
+              },
+            })
             continue
           }
 
           const resolvedUrls = await config.resolveUrlHandler(validUrl)
 
           if (resolvedUrls.failed) {
-            console.warn("[CrawleePlaywrightCrawler]", resolvedUrls.error.message)
+            console.warn({
+              time: new Date(),
+              level: "warning",
+              source: "CrawleePlaywrightCrawler",
+              message: "Failed to resolve URL",
+              context: {
+                taskId: this.#taskId,
+                gatewayUrl: validUrl,
+                error: resolvedUrls.error.message,
+              },
+            })
             continue
           }
 
@@ -64,13 +91,17 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
       this.#scrapingErrorHandler = config.scrapingErrorHandler
 
       const crawler = new Crawlee.PlaywrightCrawler({
+        sameDomainDelaySecs: 1,
+        navigationTimeoutSecs: 10,
         requestQueue: customRequestQueue,
         maxConcurrency: 5,
         maxRequestRetries: 5,
         respectRobotsTxtFile: true,
         maxCrawlDepth: config.maxDepth,
         maxRequestsPerCrawl: config.maxPages,
-        launchContext: { launcher: Playwright.chromium },
+        launchContext: {
+          launcher: Playwright.chromium,
+        },
         requestHandler: this.#playwrightRequestHandler.bind(this),
         errorHandler: this.#playwrightErrorHandler.bind(this),
       })
@@ -126,13 +157,14 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   }
 
   async #playwrightErrorHandler(context: Crawlee.BrowserCrawlingContext) {
-    if (!this.#scrapingErrorHandler)
-      throw new Error("[CrawleePlaywrightCrawler] scrapingErrorHandler not set")
+    if (!this.#scrapingErrorHandler) throw new Error("scrapingErrorHandler not set")
 
-    const { url, retryCount, errorMessages } = context.request
+    const { url, retryCount, maxRetries, errorMessages } = context.request
     const resolvingNewUrl = await this.#scrapingErrorHandler({
+      taskId: this.#taskId!,
       failedUrl: url as Entities.GatewayUrl,
       retryCount,
+      maxRetries: maxRetries ?? 0,
       errorMessages,
     })
 

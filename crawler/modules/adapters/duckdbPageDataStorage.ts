@@ -24,6 +24,18 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
       await fs.mkdir(DATABASE_PATH, { recursive: true })
 
       const dbPath = path.join(DATABASE_PATH, `${storageId}.duckdb`)
+
+      console.info({
+        time: new Date(),
+        level: "info",
+        source: "DuckdbPageDataStorage",
+        message: "opening storage",
+        context: {
+          storageId,
+          databasePath: dbPath,
+        },
+      })
+
       const duckdbInstance = await Duckdb.DuckDBInstance.create(dbPath)
       const duckdb = await duckdbInstance.connect()
 

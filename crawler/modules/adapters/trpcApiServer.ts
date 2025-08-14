@@ -27,6 +27,14 @@ export default class TrpcApiServer implements ApiServer.ApiServerInput {
   }
 
   async start(config: ApiServer.ApiServerConfig) {
+    console.info({
+      time: new Date(),
+      level: "info",
+      source: "TrpcApiServer",
+      message: "starting",
+      context: config,
+    })
+
     this.#createTaskHandler = config.handlers.createTask
 
     return Utils.tryCatch(async () =>

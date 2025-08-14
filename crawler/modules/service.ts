@@ -60,7 +60,12 @@ export default class CrawlingService {
     })
 
     if (apiServerStart.failed)
-      return console.error("[CrawlingService.#inputs.apiServer]", apiServerStart.error.message)
+      return console.error({
+        time: new Date(),
+        level: "error",
+        source: "ApiServer",
+        message: apiServerStart.error.message,
+      })
 
     this.#apiServerHandler = apiServerStart.data
 
@@ -70,10 +75,23 @@ export default class CrawlingService {
     })
 
     if (webServerStart.failed)
-      return console.error("[CrawlingService.#outputs.webServer]", webServerStart.error.message)
+      return console.error({
+        time: new Date(),
+        level: "error",
+        source: "WebServer",
+        message: webServerStart.error.message,
+      })
 
-    console.info("[CrawlingService.#outputs.apiServer] Running at http://localhost:3000/")
-    console.info("[CrawlingService.#outputs.webServer] Running at http://localhost:3000/exports")
+    console.info({
+      time: new Date(),
+      level: "info",
+      source: "CrawlingService",
+      message: "service started",
+      context: {
+        apiServerUrl: "http://localhost:3000",
+        webServerUrl: "http://localhost:3000/exports",
+      },
+    })
   }
 
   // called by WebServerPort
@@ -82,12 +100,9 @@ export default class CrawlingService {
     response: http.ServerResponse<http.IncomingMessage>,
   ) {
     const url = request.url || "/"
-
     if (!url.startsWith("/exports/")) return this.#apiServerHandler?.(request, response)
-
     response.setHeader("Content-Type", "application/octet-stream")
     const filePath = path.join(path.resolve("storage"), url)
-    console.info("[CrawlingService.#outputs.webServer]", filePath)
     fs.createReadStream(filePath).pipe(response)
   }
 
@@ -107,10 +122,15 @@ export default class CrawlingService {
       const openingPageDataStore = await this.#outputs.pageDataStorage.open(task.id)
 
       if (openingPageDataStore.failed)
-        return console.error(
-          "[CrawlingService.#output.resultStorage]",
-          openingPageDataStore.error.message,
-        )
+        return console.error({
+          time: new Date(),
+          level: "error",
+          source: "PageDataStorage",
+          message: openingPageDataStore.error.message,
+          context: {
+            taskId: task.id,
+          },
+        })
 
       const pageDataStore = openingPageDataStore.data
       this.#pageDataStores[task.id] = pageDataStore
@@ -120,26 +140,55 @@ export default class CrawlingService {
         task.similarityThreshold,
       )
       if (openingPageDuplicateStore.failed)
-        return console.error(
-          "[CrawlingService.#utils.pageDeduplicator]",
-          openingPageDuplicateStore.error.message,
-        )
+        return console.error({
+          time: new Date(),
+          level: "error",
+          source: "PageDeduplicator",
+          message: openingPageDuplicateStore.error.message,
+          context: {
+            taskId: task.id,
+            similarityThreshold: task.similarityThreshold,
+          },
+        })
 
       this.#pageDeduplicateStores[task.id] = openingPageDuplicateStore.data
 
       let initialRequests: Crawler.CrawlerRequest[] = []
       for (const arnsName of taskConfig.arnsNames) {
-        const gatewayUrl = await this.#inputs.arnsResolver.resolve(arnsName)
+        const resolvingGatewayUrl = await this.#inputs.arnsResolver.resolve(arnsName)
 
-        if (gatewayUrl.failed)
-          return console.error("[CrawlingService.#input.arnsResolver]", gatewayUrl.error.message)
+        if (resolvingGatewayUrl.failed)
+          return console.error({
+            time: new Date(),
+            level: "error",
+            source: "ArnsResolver",
+            message: resolvingGatewayUrl.error.message,
+            context: {
+              taskId: task.id,
+              arnsName,
+            },
+          })
 
-        const wayfinderUrl = await this.#inputs.arnsResolver.dissolve(gatewayUrl.data)
+        const dissolvingWayfinderUrl = await this.#inputs.arnsResolver.dissolve(
+          resolvingGatewayUrl.data,
+        )
 
-        if (wayfinderUrl.failed)
-          return console.error("[CrawlingService.#input.arnsResolver]", wayfinderUrl.error.message)
+        if (dissolvingWayfinderUrl.failed)
+          return console.error({
+            time: new Date(),
+            level: "error",
+            source: "ArnsResolver",
+            message: dissolvingWayfinderUrl.error.message,
+            context: {
+              taskId: task.id,
+              gatewayUrl: resolvingGatewayUrl.data,
+            },
+          })
 
-        initialRequests.push({ gatewayUrl: gatewayUrl.data, wayfinderUrl: wayfinderUrl.data })
+        initialRequests.push({
+          gatewayUrl: resolvingGatewayUrl.data,
+          wayfinderUrl: dissolvingWayfinderUrl.data,
+        })
       }
 
       const crawling = await crawler.start({
@@ -155,22 +204,71 @@ export default class CrawlingService {
       delete this.#pageDataStores[task.id]
       delete this.#pageDeduplicateStores[task.id]
 
+      console.info({
+        time: new Date(),
+        level: "info",
+        source: "Crawler",
+        message: "crawling completed",
+        context: {
+          taskId: task.id,
+          pageCount: task.pageCount,
+          duplicateCount: task.duplicateCount,
+        },
+      })
       if (crawling.failed)
-        return console.error("[CrawlingService.#input.crawler]", crawling.error.message)
+        return console.error({
+          time: new Date(),
+          level: "error",
+          source: "Crawler",
+          message: crawling.error.message,
+          context: {
+            taskId: task.id,
+          },
+        })
 
       const exportingPageData = await pageDataStore.export()
 
       if (exportingPageData.failed)
-        return console.error("[CrawlingService.#stores]", exportingPageData.error.message)
+        return console.error({
+          time: new Date(),
+          level: "error",
+          source: "PageDataStorage",
+          message: exportingPageData.error.message,
+          context: {
+            taskId: task.id,
+          },
+        })
 
       await pageDataStore.close()
 
+      console.info({
+        time: new Date(),
+        level: "info",
+        source: "PageDataStorage",
+        message: "export completed",
+        context: {
+          taskId: task.id,
+        },
+      })
+
       task.finishedAt = Date.now()
 
-      console.info("[CrawlingService.#inputs.crawler] Task finished:", task)
+      console.info({
+        time: new Date(),
+        level: "info",
+        source: "CrawlingService",
+        message: `task completed`,
+        context: task,
+      })
     }, 100)
 
-    console.info("[CrawlingService.#inputs.apiServer] Task created:", task)
+    console.info({
+      time: new Date(),
+      level: "info",
+      source: "ApiServer",
+      message: "task created",
+      context: task,
+    })
     this.#tasks[task.id] = task
     return task
   }
@@ -184,14 +282,26 @@ export default class CrawlingService {
 
     if (extractingHtmlData.failed) return Utils.error(extractingHtmlData.error)
 
-    const htmlWithoutTags = extractingHtmlData.data.normalizedHtml.replace(/<[^>]*>/g, "")
-
     const pageDuplicateStore = this.#pageDeduplicateStores[pageData.taskId]
     if (!pageDuplicateStore) return Utils.error(new Error("Page deduplicate store not found"))
+
+    const htmlWithoutTags = extractingHtmlData.data.normalizedHtml.replace(/<[^>]*>/g, "")
     const checkingDuplicate = await pageDuplicateStore.check(htmlWithoutTags)
     if (checkingDuplicate.failed) return Utils.error(checkingDuplicate.error)
-    if (checkingDuplicate.data) {
+    if (checkingDuplicate.data.isDuplicate) {
       task.duplicateCount++
+      console.info({
+        time: new Date(),
+        level: "info",
+        source: "PageDeduplicator",
+        message: "duplicate found",
+        context: {
+          taskId: task.id,
+          wayfinderUrl: pageData.wayfinderUrl,
+          duplicateCount: task.duplicateCount,
+          similarity: checkingDuplicate.data.similarity,
+        },
+      })
       return Utils.empty()
     }
 
@@ -204,27 +314,47 @@ export default class CrawlingService {
       a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
     )
 
+    pageData.headers.sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+    )
+
     const store = this.#pageDataStores[pageData.taskId]
     if (!store) return Utils.error(new Error("Store not found for " + pageData.taskId))
     const storingPageData = await store.save({
       ...extractingHtmlData.data,
       txId: arweaveTxId,
-      arnsName: pageData.arnsName,
-      wayfinderUrl: pageData.wayfinderUrl,
-      gatewayUrl: pageData.gatewayUrl,
-      headers: pageData.headers,
-      relativeUrls: pageData.foundUrls.filter(
-        (url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"),
-      ),
-      absoluteUrls: pageData.foundUrls.filter(
-        (url) => !url.startsWith("/") && !url.startsWith("./") && !url.startsWith("#/"),
-      ),
+      arnsName: pageData.arnsName.trim().toLowerCase(),
+      wayfinderUrl: pageData.wayfinderUrl.trim().toLowerCase(),
+      gatewayUrl: pageData.gatewayUrl.trim().toLowerCase(),
+      headers: pageData.headers.map((header) => ({
+        name: header.name.trim().toLowerCase(),
+        value: header.value.trim().toLowerCase(),
+      })),
+      relativeUrls: pageData.foundUrls
+        .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
+        .map((url) => url.trim().toLowerCase()),
+      absoluteUrls: pageData.foundUrls
+        .filter((url) => !url.startsWith("/") && !url.startsWith("./") && !url.startsWith("#/"))
+        .map((url) => url.trim().toLowerCase()),
     })
 
     // causes the crawler to retry the URL
     if (storingPageData.failed) return Utils.error(storingPageData.error)
 
-    console.debug("[CrawlingService.#inputs.crawler] Page data stored:", pageData.wayfinderUrl)
+    task.pageCount++
+
+    console.info({
+      time: new Date(),
+      level: "info",
+      source: "PageDataStorage",
+      message: "page stored",
+      context: {
+        taskId: task.id,
+        wayfinderUrl: pageData.wayfinderUrl,
+        pageNumber: task.pageCount,
+      },
+    })
+
     task.pageCount++
     return Utils.empty()
   }
@@ -258,8 +388,19 @@ export default class CrawlingService {
       if (resolvingGatewayUrl.failed) return Utils.error(resolvingGatewayUrl.error)
     } while (resolvingGatewayUrl.data === input.failedUrl)
 
-    console.warn(`[CrawlingService.#input.crawler] Failed: ${input.failedUrl}`)
-    console.warn(`[CrawlingService.#input.crawler] Retrying: ${resolvingGatewayUrl.data}`)
+    console.warn({
+      time: new Date(),
+      level: "warning",
+      source: "Crawler",
+      message: JSON.stringify(input.errorMessages),
+      context: {
+        taskId: input.taskId,
+        retry: input.retryCount + 1,
+        wayfinderUrl: resolvingWayfinderUrl.data,
+        failedGatewayUrl: input.failedUrl,
+        newGatewayUrl: resolvingGatewayUrl.data,
+      },
+    })
 
     return resolvingGatewayUrl
   }
