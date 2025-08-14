@@ -23,7 +23,7 @@ export default class NodeHtmlParserExtractor implements PageDataExtractor.PageDa
       // Extract content
       const title = document.querySelector("title")?.innerText ?? ""
       const description =
-        document.querySelector("meta[name=description]")?.getAttribute("content")?.trim() ?? ""
+        document.querySelector("meta[name=description]")?.getAttribute("content") ?? ""
       const charset = document.querySelector("meta[charset]")?.getAttribute("charset") ?? ""
       const language = document.querySelector("html")?.getAttribute("lang") ?? ""
       const openGraph = document
@@ -39,13 +39,20 @@ export default class NodeHtmlParserExtractor implements PageDataExtractor.PageDa
         })
         .filter((tag) => !!tag)
 
+      openGraph.sort((a, b) =>
+        a.property.localeCompare(b.property, undefined, { numeric: true, sensitivity: "base" }),
+      )
+
       return {
-        charset,
-        language,
-        title,
+        charset: charset.trim().toLowerCase(),
+        language: language.trim().toLowerCase(),
+        title: title.trim(),
         description,
-        openGraph,
-        normalizedHtml,
+        openGraph: openGraph.map((tag) => ({
+          property: tag.property.trim().toLowerCase(),
+          content: tag.content.trim(),
+        })),
+        normalizedHtml: normalizedHtml,
       }
     })
   }
