@@ -2,5 +2,7 @@
   "arnsNames": ["arwiki"],
   "executeJavaScript": true,
   "extractHashUrls": true,
-  "similarityThreshold": 0.9
+  "similarityThreshold": 0.9,
+  "maxDepth": 10,
+  "maxPages": 1000
 }

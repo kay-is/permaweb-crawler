@@ -2,5 +2,7 @@
   "arnsNames": ["docs", "cookbook_ao", "docs_permahub", "arwiki"],
   "executeJavaScript": true,
   "extractHashUrls": false,
-  "similarityThreshold": 0.9
+  "similarityThreshold": 0.9,
+  "maxDepth": 10,
+  "maxPages": 1000
 }
