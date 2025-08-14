@@ -25,6 +25,8 @@ export const crawlTaskSchema = v.object({
   executeJavaScript: v.boolean(),
   extractHashUrls: v.boolean(),
   similarityThreshold: v.number(),
+  maxDepth: v.number(),
+  maxPages: v.number(),
 
   // Task state
   id: v.string(),

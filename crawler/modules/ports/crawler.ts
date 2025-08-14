@@ -39,6 +39,8 @@ export type CrawlerConfig = {
   taskId: string
   initialRequests: CrawlerRequest[]
   extractHashUrls: boolean
+  maxDepth: number
+  maxPages: number
   pageDataHandler: CrawlerPageDataHandler
   scrapingErrorHandler: CrawlerScrapingErrorHandler
   resolveUrlHandler: CrawlerResolveUrlHandler

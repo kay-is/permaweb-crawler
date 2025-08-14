@@ -20,13 +20,13 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
       this.#taskId = config.taskId
       this.#extractHashUrls = config.extractHashUrls
 
-      const requestQueue = await Crawlee.RequestQueue.open(config.taskId)
+      const customRequestQueue = await Crawlee.RequestQueue.open(config.taskId)
 
-      const addRequests = requestQueue.addRequests.bind(requestQueue)
+      const addRequests = customRequestQueue.addRequests.bind(customRequestQueue)
 
       // Override addRequests to update the gateway of the found URLs
       // and change the unqieKey to WayfinderUrls to ensure uniqueness
-      requestQueue.addRequests = async (requests) => {
+      customRequestQueue.addRequests = async (requests) => {
         const updatedRequests: Crawlee.Source[] = []
         for await (const request of requests) {
           const oldGatewayUrl = typeof request === "string" ? request : request.url
@@ -64,10 +64,12 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
       this.#scrapingErrorHandler = config.scrapingErrorHandler
 
       const crawler = new Crawlee.PlaywrightCrawler({
-        requestQueue,
-        maxConcurrency: 10,
+        requestQueue: customRequestQueue,
+        maxConcurrency: 5,
         maxRequestRetries: 5,
         respectRobotsTxtFile: true,
+        maxCrawlDepth: config.maxDepth,
+        maxRequestsPerCrawl: config.maxPages,
         launchContext: { launcher: Playwright.chromium },
         requestHandler: this.#playwrightRequestHandler.bind(this),
         errorHandler: this.#playwrightErrorHandler.bind(this),

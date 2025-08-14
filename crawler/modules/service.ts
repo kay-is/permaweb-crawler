@@ -146,6 +146,8 @@ export default class CrawlingService {
         taskId: task.id,
         initialRequests,
         extractHashUrls: taskConfig.extractHashUrls,
+        maxDepth: taskConfig.maxDepth,
+        maxPages: taskConfig.maxPages,
         pageDataHandler: this.#pageDataHandler.bind(this),
         scrapingErrorHandler: this.#scrapingErrorHandler.bind(this),
         resolveUrlHandler: this.#resolveUrlHandler.bind(this),
