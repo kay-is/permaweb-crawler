@@ -1,6 +1,6 @@
 {
-  "arnsNames": ["docs"],
+  "arnsNames": ["arwiki"],
   "executeJavaScript": true,
-  "extractHashUrls": false,
+  "extractHashUrls": true,
   "similarityThreshold": 0.9
 }

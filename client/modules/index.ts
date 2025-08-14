@@ -4,6 +4,7 @@ import { ClientService } from "./clientService.js"
 
 console.info("Starting client...")
 const taskId = await ClientService.start({
+  taskId: "arwiki",
   adapters: {
     inputs: {
       taskConfigStore: new FsTaskConfigStorageAdapter("fixtures"),
