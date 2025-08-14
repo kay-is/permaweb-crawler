@@ -31,7 +31,7 @@ export default class StaticWayfinderArnsResolver implements ArnsResolver.ArnsRes
         : { arnsName: urlOrArnsName }
 
       const resolvedUrl = await this.#wayfinder.resolveUrl(config)
-      return resolvedUrl.toString() as Entities.GatewayUrl
+      return decodeURIComponent(resolvedUrl.toString()) as Entities.GatewayUrl
     })
   }
 

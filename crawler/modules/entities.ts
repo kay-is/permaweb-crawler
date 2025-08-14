@@ -20,18 +20,30 @@ export const crawlerTypesSchema = v.union([v.literal("browser") /* v.literal("ht
 export type CrawlerTypes = v.InferInput<typeof crawlerTypesSchema>
 
 export const crawlTaskSchema = v.object({
-  id: v.string(),
+  // Task config options
   arnsNames: v.array(arnsNameSchema),
   executeJavaScript: v.boolean(),
   extractHashUrls: v.boolean(),
+  similarityThreshold: v.number(),
+
+  // Task state
+  id: v.string(),
   pageCount: v.number(),
+  duplicateCount: v.number(),
+  error: v.optional(v.string()),
   createdAt: v.number(),
   finishedAt: v.optional(v.number()),
-  error: v.optional(v.string()),
 })
 export type CrawlTask = v.InferInput<typeof crawlTaskSchema>
 
-export const crawlTaskConfigSchema = v.omit(crawlTaskSchema, ["id", "pageCount", "createdAt"])
+export const crawlTaskConfigSchema = v.omit(crawlTaskSchema, [
+  "id",
+  "pageCount",
+  "createdAt",
+  "finishedAt",
+  "duplicateCount",
+  "error",
+])
 export type CrawlTaskConfig = v.InferInput<typeof crawlTaskConfigSchema>
 
 export const htmlDataSchema = v.object({

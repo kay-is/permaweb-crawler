@@ -1,3 +1,4 @@
+import crypto from "node:crypto"
 import path from "node:path"
 import fs from "node:fs"
 import http from "node:http"
@@ -10,6 +11,7 @@ import type * as PageDataExtractor from "./ports/pageDataExtractor.js"
 import type * as ArnsResolver from "./ports/arnsResolver.js"
 import type * as PageDataStorage from "./ports/pageDataStorage.js"
 import type * as WebServer from "./ports/webServer.js"
+import type * as PageDeduplicator from "./ports/pageDeduplicator.js"
 
 export interface CrawlingServiceConfig {
   adapters: {
@@ -20,9 +22,10 @@ export interface CrawlingServiceConfig {
     }
     utils: {
       pageDataExtractor: PageDataExtractor.PageDataExtractorUtil
+      pageDeduplicator: PageDeduplicator.PageDeduplicatorUtil
     }
     outputs: {
-      resultStorage: PageDataStorage.PageDataStorageOutput
+      pageDataStorage: PageDataStorage.PageDataStorageOutput
       webServer: WebServer.WebServerOutput
     }
   }
@@ -34,8 +37,10 @@ export default class CrawlingService {
   #utils: CrawlingServiceConfig["adapters"]["utils"]
   #outputs: CrawlingServiceConfig["adapters"]["outputs"]
 
+  #pageDataStores: Record<string, PageDataStorage.PageDataStore> = {}
+  #pageDeduplicateStores: Record<string, PageDeduplicator.PageDuplicateStore> = {}
+
   #apiServerHandler?: ApiServer.ApiServerHandler
-  #stores: Record<string, PageDataStorage.PageDataStore> = {}
 
   static async start(config: CrawlingServiceConfig) {
     return new CrawlingService(config).start()
@@ -92,19 +97,35 @@ export default class CrawlingService {
       ...taskConfig,
       id: crypto.randomUUID(),
       pageCount: 0,
+      duplicateCount: 0,
       createdAt: Date.now(),
     }
 
     const crawler = this.#inputs.crawlers["browser"]
 
     setTimeout(async () => {
-      const openStore = await this.#outputs.resultStorage.open(task.id)
+      const openingPageDataStore = await this.#outputs.pageDataStorage.open(task.id)
 
-      if (openStore.failed)
-        return console.error("[CrawlingService.#output.resultStorage]", openStore.error.message)
+      if (openingPageDataStore.failed)
+        return console.error(
+          "[CrawlingService.#output.resultStorage]",
+          openingPageDataStore.error.message,
+        )
 
-      const store = openStore.data
-      this.#stores[task.id] = store
+      const pageDataStore = openingPageDataStore.data
+      this.#pageDataStores[task.id] = pageDataStore
+
+      const openingPageDuplicateStore = await this.#utils.pageDeduplicator.open(
+        task.id,
+        task.similarityThreshold,
+      )
+      if (openingPageDuplicateStore.failed)
+        return console.error(
+          "[CrawlingService.#utils.pageDeduplicator]",
+          openingPageDuplicateStore.error.message,
+        )
+
+      this.#pageDeduplicateStores[task.id] = openingPageDuplicateStore.data
 
       let initialRequests: Crawler.CrawlerRequest[] = []
       for (const arnsName of taskConfig.arnsNames) {
@@ -129,25 +150,22 @@ export default class CrawlingService {
         scrapingErrorHandler: this.#scrapingErrorHandler.bind(this),
         resolveUrlHandler: this.#resolveUrlHandler.bind(this),
       })
+      delete this.#pageDataStores[task.id]
+      delete this.#pageDeduplicateStores[task.id]
 
       if (crawling.failed)
         return console.error("[CrawlingService.#input.crawler]", crawling.error.message)
 
-      const dataExport = await store.export()
+      const exportingPageData = await pageDataStore.export()
 
-      if (dataExport.failed)
-        return console.error("[CrawlingService.#stores]", dataExport.error.message)
+      if (exportingPageData.failed)
+        return console.error("[CrawlingService.#stores]", exportingPageData.error.message)
 
-      await store.close()
-      delete this.#stores[task.id]
+      await pageDataStore.close()
 
       task.finishedAt = Date.now()
-      console.info(
-        "[CrawlingService.#inputs.apiServer] Task finished:",
-        task.id,
-        task.pageCount,
-        "pages stored",
-      )
+
+      console.info("[CrawlingService.#inputs.crawler] Task finished:", task)
     }, 100)
 
     console.info("[CrawlingService.#inputs.apiServer] Task created:", task)
@@ -157,13 +175,26 @@ export default class CrawlingService {
 
   // called by CrawlerPort for every crawled page
   async #pageDataHandler(pageData: Crawler.CrawlerPageData) {
-    console.info(`[CrawlingService.#inputs.crawler] Scraping ${pageData.wayfinderUrl}`)
+    const task = this.#tasks[pageData.taskId]
+    if (!task) return Utils.error(new Error("Task not found for " + pageData.taskId))
+
     const extractingHtmlData = await this.#utils.pageDataExtractor.extract(pageData.html)
 
     if (extractingHtmlData.failed) return Utils.error(extractingHtmlData.error)
 
-    const arweaveTxId = pageData.headers.find((header) => header.name === "x-ar-io-data-id")?.value
+    const htmlWithoutTags = extractingHtmlData.data.normalizedHtml.replace(/<[^>]*>/g, "")
 
+    const pageDuplicateStore = this.#pageDeduplicateStores[pageData.taskId]
+    if (!pageDuplicateStore) return Utils.error(new Error("Page deduplicate store not found"))
+    const checkingDuplicate = await pageDuplicateStore.check(htmlWithoutTags)
+    if (checkingDuplicate.failed) return Utils.error(checkingDuplicate.error)
+    if (checkingDuplicate.data) {
+      console.debug("Duplicate", pageData.wayfinderUrl)
+      task.duplicateCount++
+      return Utils.empty()
+    }
+
+    const arweaveTxId = pageData.headers.find((header) => header.name === "x-ar-io-data-id")?.value
     if (!arweaveTxId)
       return Utils.error(new Error(`Missing x-ar-io-data-id header for ${pageData.gatewayUrl}`))
 
@@ -172,9 +203,8 @@ export default class CrawlingService {
       a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
     )
 
-    const store = this.#stores[pageData.taskId]
+    const store = this.#pageDataStores[pageData.taskId]
     if (!store) return Utils.error(new Error("Store not found for " + pageData.taskId))
-
     const storingPageData = await store.save({
       ...extractingHtmlData.data,
       txId: arweaveTxId,
@@ -182,49 +212,56 @@ export default class CrawlingService {
       wayfinderUrl: pageData.wayfinderUrl,
       gatewayUrl: pageData.gatewayUrl,
       headers: pageData.headers,
-      relativeUrls: pageData.foundUrls.filter((url) => url.startsWith("/")),
-      absoluteUrls: pageData.foundUrls.filter((url) => !url.startsWith("/")),
+      relativeUrls: pageData.foundUrls.filter(
+        (url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"),
+      ),
+      absoluteUrls: pageData.foundUrls.filter(
+        (url) => !url.startsWith("/") && !url.startsWith("./") && !url.startsWith("#/"),
+      ),
     })
 
-    // returning errors causes the crawler to retry the URL
-    if (storingPageData.failed && !storingPageData.error.message.includes("Duplicate"))
+    if (storingPageData.failed && !storingPageData.error.message.includes("Duplicate")) {
+      // causes the crawler to retry the URL
       return Utils.error(storingPageData.error)
+    }
 
-    const task = this.#tasks[pageData.taskId]
-    if (task && storingPageData.ok) task.pageCount++
-
+    console.debug("[CrawlingService.#inputs.crawler] Page data stored:", pageData.wayfinderUrl)
+    task.pageCount++
     return Utils.empty()
   }
 
   // called by CrawlerPort for every new URL
   // Updates URLs to a new gateway
   async #resolveUrlHandler(oldGatewayUrl: Entities.GatewayUrl) {
-    const wayfinderUrl = await this.#inputs.arnsResolver.dissolve(oldGatewayUrl)
-    if (wayfinderUrl.failed) return Utils.error(wayfinderUrl.error)
+    const resolvingWayfinderUrl = await this.#inputs.arnsResolver.dissolve(oldGatewayUrl)
+    if (resolvingWayfinderUrl.failed) return Utils.error(resolvingWayfinderUrl.error)
 
-    const gatewayUrl = await this.#inputs.arnsResolver.resolve(wayfinderUrl.data)
-    if (gatewayUrl.failed) return Utils.error(gatewayUrl.error)
+    const resolvingGatewayUrl = await this.#inputs.arnsResolver.resolve(resolvingWayfinderUrl.data)
+    if (resolvingGatewayUrl.failed) return Utils.error(resolvingGatewayUrl.error)
 
-    return Utils.ok({ gatewayUrl: gatewayUrl.data, wayfinderUrl: wayfinderUrl.data })
+    return Utils.ok({
+      gatewayUrl: resolvingGatewayUrl.data,
+      wayfinderUrl: resolvingWayfinderUrl.data,
+    })
   }
 
   // called by CrawlerPort in the case of scraping issues
   async #scrapingErrorHandler(input: Crawler.CrawlerErrorHandlerData) {
-    const wayfinderUrl = await this.#inputs.arnsResolver.dissolve(input.failedUrl)
+    const resolvingWayfinderUrl = await this.#inputs.arnsResolver.dissolve(input.failedUrl)
 
-    if (wayfinderUrl.failed) return Utils.error(wayfinderUrl.error)
+    if (resolvingWayfinderUrl.failed) return Utils.error(resolvingWayfinderUrl.error)
 
-    let newGatewayUrl: Utils.Result<Entities.GatewayUrl>
+    let resolvingGatewayUrl: Utils.Result<Entities.GatewayUrl>
     do {
       // choose new gateway for failed URL
-      newGatewayUrl = await this.#inputs.arnsResolver.resolve(wayfinderUrl.data)
+      resolvingGatewayUrl = await this.#inputs.arnsResolver.resolve(resolvingWayfinderUrl.data)
 
-      if (newGatewayUrl.failed) return Utils.error(newGatewayUrl.error)
-    } while (newGatewayUrl.data === input.failedUrl)
+      if (resolvingGatewayUrl.failed) return Utils.error(resolvingGatewayUrl.error)
+    } while (resolvingGatewayUrl.data === input.failedUrl)
 
     console.warn(`[CrawlingService.#input.crawler] Failed: ${input.failedUrl}`)
-    console.warn(`[CrawlingService.#input.crawler] Retrying: ${newGatewayUrl.data}`)
+    console.warn(`[CrawlingService.#input.crawler] Retrying: ${resolvingGatewayUrl.data}`)
 
-    return newGatewayUrl
+    return resolvingGatewayUrl
   }
 }

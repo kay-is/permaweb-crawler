@@ -1,3 +1,4 @@
+import crypto from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
 import * as Duckdb from "@duckdb/node-api"
@@ -31,8 +32,9 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
 
       await duckdb.run(`
         CREATE TABLE IF NOT EXISTS ${detailsTableName} (
-          txId VARCHAR PRIMARY KEY,
-
+          htmlHash VARCHAR PRIMARY KEY,
+          
+          txId VARCHAR NOT NULL,
           arnsName VARCHAR NOT NULL,
           wayfinderUrl VARCHAR NOT NULL,
           gatewayUrl VARCHAR NOT NULL,
@@ -50,34 +52,24 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
         );
 
         CREATE TABLE IF NOT EXISTS ${htmlTableName} (
-          txId VARCHAR PRIMARY KEY,
-          normalizedHtml VARCHAR,
+          htmlHash VARCHAR PRIMARY KEY,
+          normalizedHtml VARCHAR NOT NULL,
           
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `)
 
-      // Load existing TX IDs to avoid duplicates
-      const txIds = (await duckdb.runAndReadAll(`SELECT txId FROM ${detailsTableName}`))
-        .getRowObjects()
-        .filter((row) => !!row.txId)
-        .map((row) => row.txId)
-
-      const seenTxIds = new Set(txIds)
-
       return {
         save: (data: Entities.PageData) =>
           Utils.tryCatch(async () => {
-            if (seenTxIds.has(data.txId)) throw new Error(`Duplicate txId: ${data.txId}`)
-
-            seenTxIds.add(data.txId)
+            const htmlHash = crypto.createHash("sha256").update(data.normalizedHtml).digest("hex")
 
             await duckdb.run(
               `
             INSERT INTO ${detailsTableName}
             (arnsName, wayfinderUrl, gatewayUrl, txId, charset, language, title, description, 
-            headers, absoluteUrls, relativeUrls, openGraph)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            headers, absoluteUrls, relativeUrls, openGraph, htmlHash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
               [
                 data.arnsName,
@@ -95,16 +87,17 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
                   key: property,
                   value: content,
                 })),
+                htmlHash,
               ],
             )
 
             await duckdb.run(
               `
             INSERT INTO ${htmlTableName}
-            (txId, normalizedHtml)
+            (htmlHash, normalizedHtml)
             VALUES (?, ?)
             `,
-              [data.txId, data.normalizedHtml],
+              [htmlHash, data.normalizedHtml],
             )
           }),
         export: () =>

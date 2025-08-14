@@ -6,6 +6,8 @@ import * as Utils from "../utils.js"
 import * as Entities from "../entities.js"
 import type * as Crawler from "../ports/crawler.js"
 
+Crawlee.log.setLevel(Crawlee.LogLevel.WARNING)
+
 export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   #taskId?: string
   #extractHashUrls?: boolean
@@ -31,6 +33,7 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
           if (!oldGatewayUrl) continue
 
           if (!config.extractHashUrls && oldGatewayUrl.includes("#")) continue
+          if (config.extractHashUrls && oldGatewayUrl.split("#").length > 2) continue
 
           // TODO: Improve URL validation
           const validUrl = v.parse(Entities.gatewayUrlSchema, oldGatewayUrl) as
@@ -61,8 +64,10 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
       this.#scrapingErrorHandler = config.scrapingErrorHandler
 
       const crawler = new Crawlee.PlaywrightCrawler({
-        maxConcurrency: 10,
         requestQueue,
+        maxConcurrency: 10,
+        maxRequestRetries: 5,
+        respectRobotsTxtFile: true,
         launchContext: { launcher: Playwright.chromium },
         requestHandler: this.#playwrightRequestHandler.bind(this),
         errorHandler: this.#playwrightErrorHandler.bind(this),
@@ -81,6 +86,8 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   async #playwrightRequestHandler(context: Crawlee.PlaywrightCrawlingContext) {
     if (!this.#taskId) throw new Error("taskId not set!")
     if (!this.#pageDataHandler) throw new Error("scrapingHandler not set!")
+
+    if (this.#extractHashUrls) await context.page.waitForLoadState("networkidle")
 
     // the locator() call ensures page JS was executed before selecting elements
     // which is vital for the content() call below.
