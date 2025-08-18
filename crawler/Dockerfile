@@ -6,10 +6,12 @@ RUN npm --quiet set progress=false && npm ci --omit=dev --omit=optional
 
 COPY . .
 
-RUN npm run build
+# RUN npm run build
 
 EXPOSE 3000
 
 USER root
 
-CMD ["npm", "start"]
+# CMD ["npm", "start"]
+
+CMD ["npm", "run", "dev"]
