@@ -29,6 +29,7 @@ export type CrawlerErrorHandlerData = {
   errorMessages: string[]
 }
 
+export type CrawlerPageInitHandler = () => void
 export type CrawlerPageDataHandler = (pageData: CrawlerPageData) => Utils.PromisedEmptyResult
 export type CrawlerScrapingErrorHandler = (
   errorData: CrawlerErrorHandlerData,
@@ -43,6 +44,7 @@ export type CrawlerConfig = {
   extractHashUrls: boolean
   maxDepth: number
   maxPages: number
+  pageInitHandler: CrawlerPageInitHandler
   pageDataHandler: CrawlerPageDataHandler
   scrapingErrorHandler: CrawlerScrapingErrorHandler
   resolveUrlHandler: CrawlerResolveUrlHandler

@@ -16,7 +16,7 @@ export const gatewayUrlSchema = v.pipe(
 )
 export type GatewayUrl = `https://${string}.${string}`
 
-export const crawlerTypesSchema = v.union([v.literal("browser") /* v.literal("html") */])
+export const crawlerTypesSchema = v.union([v.literal("browser"), v.literal("html")])
 export type CrawlerTypes = v.InferInput<typeof crawlerTypesSchema>
 
 export const crawlTaskSchema = v.object({

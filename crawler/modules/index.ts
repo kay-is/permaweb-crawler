@@ -1,7 +1,7 @@
 import CrawleePlaywrightCrawler from "./adapters/crawleePlaywrightCrawler.js"
+import CrawleeNodeHtmlParserCrawler from "./adapters/crawleeNodeHtmlParserCrawler.js"
 import NodeHtmlParserExtractor from "./adapters/nodeHtmlParserExtractor.js"
 import TrpcApiServer from "./adapters/trpcApiServer.js"
-import StaticWayfinderArnsResolver from "./adapters/staticWayfinderArnsResolver.js"
 import DuckdbPageDataStorage from "./adapters/duckdbPageDataStorage.js"
 import SuperminhashMemoryPageDeduplicator from "./adapters/superminhashMemoryPageDeduplicator.js"
 import NodeHttpWebServer from "./adapters/nodeHttpWebServer.js"
@@ -14,6 +14,7 @@ await CrawlingService.start({
       apiServer: new TrpcApiServer(),
       crawlers: {
         browser: new CrawleePlaywrightCrawler(),
+        html: new CrawleeNodeHtmlParserCrawler(),
       },
       arnsResolver: new NetworkWayfinderArnsResolver(),
     },

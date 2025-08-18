@@ -116,7 +116,9 @@ export default class CrawlingService {
       createdAt: Date.now(),
     }
 
-    const crawler = this.#inputs.crawlers["browser"]
+    const crawler = taskConfig.executeJavaScript
+      ? this.#inputs.crawlers["browser"]
+      : this.#inputs.crawlers["html"]
 
     setTimeout(async () => {
       const openingPageDataStore = await this.#outputs.pageDataStorage.open(task.id)
@@ -197,6 +199,7 @@ export default class CrawlingService {
         extractHashUrls: taskConfig.extractHashUrls,
         maxDepth: taskConfig.maxDepth,
         maxPages: taskConfig.maxPages,
+        pageInitHandler: this.#pageInitHandler,
         pageDataHandler: this.#pageDataHandler.bind(this),
         scrapingErrorHandler: this.#scrapingErrorHandler.bind(this),
         resolveUrlHandler: this.#resolveUrlHandler.bind(this),
@@ -239,13 +242,23 @@ export default class CrawlingService {
           },
         })
 
+      console.info({
+        time: new Date(),
+        level: "info",
+        source: "PageDataStorage",
+        message: "export completed",
+        context: {
+          taskId: task.id,
+        },
+      })
+
       await pageDataStore.close()
 
       console.info({
         time: new Date(),
         level: "info",
         source: "PageDataStorage",
-        message: "export completed",
+        message: "storage closed",
         context: {
           taskId: task.id,
         },
@@ -270,7 +283,26 @@ export default class CrawlingService {
       context: task,
     })
     this.#tasks[task.id] = task
+
     return task
+  }
+
+  // called by CrawlerPort for every crawled page
+  // excutes befor the javascript of the page
+  // used to set up a stable environment for the crawler
+  // "this" is not available in this function because it's called in the browser context
+  #pageInitHandler = () => {
+    let randomSeed = 0
+    Math.random = () => {
+      const x = Math.sin(randomSeed++) * 10000
+      return x - Math.floor(x)
+    }
+
+    let nowSeed = 0
+    Date.now = () => nowSeed++
+
+    let performanceSeed = 0
+    performance.now = () => performanceSeed++
   }
 
   // called by CrawlerPort for every crawled page
@@ -305,9 +337,10 @@ export default class CrawlingService {
       return Utils.empty()
     }
 
-    const arweaveTxId = pageData.headers.find((header) => header.name === "x-ar-io-data-id")?.value
-    if (!arweaveTxId)
-      return Utils.error(new Error(`Missing x-ar-io-data-id header for ${pageData.gatewayUrl}`))
+    const arweaveTxId = pageData.headers.find(
+      (header) => header.name === "x-arns-resolved-id",
+    )?.value
+    if (!arweaveTxId) return Utils.error(new Error(`x-arns-resolved-id header missing`))
 
     // sort found URLs, but don't use local compare, the sorting needs to be stable across different environments
     pageData.foundUrls.sort((a, b) =>
@@ -328,7 +361,7 @@ export default class CrawlingService {
       gatewayUrl: pageData.gatewayUrl.trim().toLowerCase(),
       headers: pageData.headers.map((header) => ({
         name: header.name.trim().toLowerCase(),
-        value: header.value.trim().toLowerCase(),
+        value: header && header.value && header.value.trim ? header.value.trim().toLowerCase() : "",
       })),
       relativeUrls: pageData.foundUrls
         .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
@@ -355,7 +388,6 @@ export default class CrawlingService {
       },
     })
 
-    task.pageCount++
     return Utils.empty()
   }
 
@@ -392,7 +424,7 @@ export default class CrawlingService {
       time: new Date(),
       level: "warning",
       source: "Crawler",
-      message: JSON.stringify(input.errorMessages),
+      message: input.errorMessages.pop()?.split("\n"),
       context: {
         taskId: input.taskId,
         retry: input.retryCount + 1,
