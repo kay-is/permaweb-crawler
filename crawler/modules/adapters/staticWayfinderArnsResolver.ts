@@ -13,8 +13,6 @@ export default class StaticWayfinderArnsResolver implements ArnsResolver.ArnsRes
 
   constructor(config: StaticWayfinderArnsResolverAdapterConfig) {
     console.info({
-      time: new Date(),
-      level: "info",
       source: "StaticWayfinderArnsResolver",
       message: "initializing",
       context: {

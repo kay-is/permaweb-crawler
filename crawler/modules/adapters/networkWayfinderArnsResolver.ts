@@ -10,8 +10,6 @@ export default class NetworkWayfinderArnsResolver implements ArnsResolver.ArnsRe
 
   constructor() {
     console.info({
-      time: new Date(),
-      level: "info",
       source: "NetworkWayfinderArnsResolver",
       message: "initializing",
       context: {

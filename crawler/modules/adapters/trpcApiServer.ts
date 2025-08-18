@@ -9,6 +9,7 @@ export type AppRouter = TrpcApiServer["appRouter"]
 
 export default class TrpcApiServer implements ApiServer.ApiServerInput {
   #createTaskHandler?: ApiServer.CreateTaskHandler
+  #listTasksHandler?: ApiServer.ListTasksHandler
 
   #trpc = TrpcServer.initTRPC.create()
   #appRouter = this.#trpc.router({
@@ -19,6 +20,10 @@ export default class TrpcApiServer implements ApiServer.ApiServerInput {
         if (!this.#createTaskHandler) throw new Error("No createTaskHandler set!")
         return this.#createTaskHandler(input)
       }),
+    listTasks: this.#trpc.procedure.output(Entities.crawlTaskListSchema).query(() => {
+      if (!this.#listTasksHandler) throw new Error("No listTasksHandler set!")
+      return this.#listTasksHandler()
+    }),
   })
 
   // for type extraction
@@ -28,17 +33,28 @@ export default class TrpcApiServer implements ApiServer.ApiServerInput {
 
   async start(config: ApiServer.ApiServerConfig) {
     console.info({
-      time: new Date(),
-      level: "info",
       source: "TrpcApiServer",
       message: "starting",
       context: config,
     })
 
     this.#createTaskHandler = config.handlers.createTask
+    this.#listTasksHandler = config.handlers.listTasks
 
     return Utils.tryCatch(async () =>
-      TrpcServerAdapter.createHTTPHandler({ router: this.#appRouter }),
+      TrpcServerAdapter.createHTTPHandler({
+        router: this.#appRouter,
+        onError: (opts) => {
+          console.error({
+            source: "TrpcApiServer",
+            message: opts.error.message,
+            context: {
+              path: opts.path,
+              input: opts.input,
+            },
+          })
+        },
+      }),
     )
   }
 }

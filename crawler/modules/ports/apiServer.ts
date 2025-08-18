@@ -7,9 +7,12 @@ export type CreateTaskHandler = (
   taskDefinition: Entities.CrawlTaskConfig,
 ) => Promise<Entities.CrawlTask>
 
+export type ListTasksHandler = () => Promise<Entities.CrawlTask[]>
+
 export type ApiServerConfig = {
   handlers: {
     createTask: CreateTaskHandler
+    listTasks: ListTasksHandler
   }
 }
 

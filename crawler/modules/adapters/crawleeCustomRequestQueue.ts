@@ -32,8 +32,6 @@ export const open = async (config: CustomRequestQueueConfig) => {
         | undefined
       if (!validUrl) {
         console.warn({
-          time: new Date(),
-          level: "warning",
           source: "CrawleeCustomRequestQueue",
           message: "Invalid URL",
           context: {
@@ -48,8 +46,6 @@ export const open = async (config: CustomRequestQueueConfig) => {
 
       if (resolvedUrls.failed) {
         console.warn({
-          time: new Date(),
-          level: "warning",
           source: "CrawleeCustomRequestQueue",
           message: "Failed to resolve URL",
           context: {

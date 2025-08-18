@@ -8,6 +8,15 @@ import NodeHttpWebServer from "./adapters/nodeHttpWebServer.js"
 import CrawlingService from "./service.js"
 import NetworkWayfinderArnsResolver from "./adapters/networkWayfinderArnsResolver.js"
 
+console.info = (args: Record<string, any>) =>
+  console.log(JSON.stringify({ level: "info", time: new Date(), ...args }).replace(/^\uFEFF/, ""))
+
+console.warn = (args: Record<string, any>) =>
+  console.log(JSON.stringify({ level: "warn", time: new Date(), ...args }).replace(/^\uFEFF/, ""))
+
+console.error = (args: Record<string, any>) =>
+  console.log(JSON.stringify({ level: "error", time: new Date(), ...args }).replace(/^\uFEFF/, ""))
+
 await CrawlingService.start({
   adapters: {
     inputs: {

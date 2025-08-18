@@ -26,8 +26,6 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
       const dbPath = path.join(DATABASE_PATH, `${storageId}.duckdb`)
 
       console.info({
-        time: new Date(),
-        level: "info",
         source: "DuckdbPageDataStorage",
         message: "opening storage",
         context: {
@@ -130,8 +128,6 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
             await fs.unlink(path.join(DATABASE_PATH, `${storageId}.duckdb`))
 
             console.info({
-              time: new Date(),
-              level: "info",
               source: "DuckdbPageDataStorage",
               message: "storage closed and database deleted",
               context: {

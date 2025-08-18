@@ -19,8 +19,6 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   async start(config: Crawler.CrawlerConfig) {
     return Utils.tryCatch(async () => {
       console.info({
-        time: new Date(),
-        level: "info",
         source: "CrawleePlaywrightCrawler",
         message: "starting",
         context: config,

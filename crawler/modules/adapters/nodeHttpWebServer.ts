@@ -7,8 +7,6 @@ export default class NodeHttpWebServer implements WebServer.WebServerOutput {
   async start(config: WebServer.WebServerConfig) {
     return Utils.tryCatch(async () => {
       console.info({
-        time: new Date(),
-        level: "info",
         source: "NodeHttpWebServer",
         message: "starting",
         context: config,
@@ -21,8 +19,6 @@ export default class NodeHttpWebServer implements WebServer.WebServerOutput {
           Array("SIGINT", "SIGTERM").forEach((signal) => {
             process.on(signal, async () => {
               console.info({
-                time: new Date(),
-                level: "info",
                 source: "NodeHttpWebServer",
                 message: "Shutting down",
                 context: {
@@ -33,13 +29,9 @@ export default class NodeHttpWebServer implements WebServer.WebServerOutput {
               await new Promise((r) => server.close(r))
 
               console.info({
-                time: new Date(),
-                level: "info",
                 source: "NodeHttpWebServer",
                 message: "Shutdown complete",
-                context: {
-                  signal,
-                },
+                context: { signal },
               })
               process.exit(0)
             })

@@ -18,8 +18,6 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
   async start(config: Crawler.CrawlerConfig) {
     return Utils.tryCatch(async () => {
       console.info({
-        time: new Date(),
-        level: "info",
         source: "CrawleeNodeHtmlParserCrawler",
         message: "starting",
         context: config,

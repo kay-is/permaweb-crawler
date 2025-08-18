@@ -56,13 +56,12 @@ export default class CrawlingService {
     const apiServerStart = await this.#inputs.apiServer.start({
       handlers: {
         createTask: this.#createTaskHandler.bind(this),
+        listTasks: this.#listTasksHandler.bind(this),
       },
     })
 
     if (apiServerStart.failed)
       return console.error({
-        time: new Date(),
-        level: "error",
         source: "ApiServer",
         message: apiServerStart.error.message,
       })
@@ -75,21 +74,15 @@ export default class CrawlingService {
     })
 
     if (webServerStart.failed)
-      return console.error({
-        time: new Date(),
-        level: "error",
-        source: "WebServer",
-        message: webServerStart.error.message,
-      })
+      return console.error({ source: "WebServer", message: webServerStart.error.message })
 
     console.info({
-      time: new Date(),
-      level: "info",
       source: "CrawlingService",
       message: "service started",
       context: {
-        apiServerUrl: "http://localhost:3000",
-        webServerUrl: "http://localhost:3000/exports",
+        apiServerUrl: "http://localhost:3000/",
+        webAppUrl: "http://localhost:3000/app/",
+        exportDataUrl: "http://localhost:3000/exports/",
       },
     })
   }
@@ -99,11 +92,65 @@ export default class CrawlingService {
     request: http.IncomingMessage,
     response: http.ServerResponse<http.IncomingMessage>,
   ) {
-    const url = request.url || "/"
-    if (!url.startsWith("/exports/")) return this.#apiServerHandler?.(request, response)
-    response.setHeader("Content-Type", "application/octet-stream")
-    const filePath = path.join(path.resolve("storage"), url)
-    fs.createReadStream(filePath).pipe(response)
+    let url = request.url || "/"
+
+    if (url.startsWith("/app/")) {
+      if (url.endsWith("/")) {
+        response.setHeader("Location", url + "index.html")
+        response.statusCode = 301
+        return response.end()
+      }
+
+      response.setHeader("Content-Type", "text/html")
+      url = url.split("?")[0] as string
+      const filePath = path.join(path.resolve("public"), url)
+      try {
+        return fs.createReadStream(filePath).pipe(response)
+      } catch (error: any) {
+        console.error({
+          source: "WebServer",
+          message: `Error reading file ${filePath}: ${error.message}`,
+        })
+        response.statusCode = 404
+        return response.end("File not found")
+      }
+    }
+
+    if (url.startsWith("/exports/")) {
+      if (url.endsWith("/")) {
+        return fs.readdir(path.resolve("storage/exports"), (_, files) => {
+          response.setHeader("Content-Type", "application/json")
+          try {
+            return response.end(
+              JSON.stringify({
+                files: files.map((file) => ({
+                  url: `/exports/${file}`,
+                  time: fs.statSync(path.join("storage/exports", file)).mtime,
+                  size: fs.statSync(path.join("storage/exports", file)).size,
+                })),
+              }),
+            )
+          } catch (error: any) {
+            return response.end(JSON.stringify({ files: [] }))
+          }
+        })
+      }
+
+      response.setHeader("Content-Type", "application/octet-stream")
+      const filePath = path.join(path.resolve("storage"), url)
+      try {
+        return fs.createReadStream(filePath).pipe(response)
+      } catch (error: any) {
+        console.error({
+          source: "WebServer",
+          message: `Error reading file ${filePath}: ${error.message}`,
+        })
+        response.statusCode = 404
+        return response.end("File not found")
+      }
+    }
+
+    return this.#apiServerHandler?.(request, response)
   }
 
   // called by ApiServerPort for every new crawl request
@@ -125,8 +172,6 @@ export default class CrawlingService {
 
       if (openingPageDataStore.failed)
         return console.error({
-          time: new Date(),
-          level: "error",
           source: "PageDataStorage",
           message: openingPageDataStore.error.message,
           context: {
@@ -143,8 +188,6 @@ export default class CrawlingService {
       )
       if (openingPageDuplicateStore.failed)
         return console.error({
-          time: new Date(),
-          level: "error",
           source: "PageDeduplicator",
           message: openingPageDuplicateStore.error.message,
           context: {
@@ -161,8 +204,6 @@ export default class CrawlingService {
 
         if (resolvingGatewayUrl.failed)
           return console.error({
-            time: new Date(),
-            level: "error",
             source: "ArnsResolver",
             message: resolvingGatewayUrl.error.message,
             context: {
@@ -177,8 +218,6 @@ export default class CrawlingService {
 
         if (dissolvingWayfinderUrl.failed)
           return console.error({
-            time: new Date(),
-            level: "error",
             source: "ArnsResolver",
             message: dissolvingWayfinderUrl.error.message,
             context: {
@@ -208,8 +247,6 @@ export default class CrawlingService {
       delete this.#pageDeduplicateStores[task.id]
 
       console.info({
-        time: new Date(),
-        level: "info",
         source: "Crawler",
         message: "crawling completed",
         context: {
@@ -220,8 +257,6 @@ export default class CrawlingService {
       })
       if (crawling.failed)
         return console.error({
-          time: new Date(),
-          level: "error",
           source: "Crawler",
           message: crawling.error.message,
           context: {
@@ -233,8 +268,6 @@ export default class CrawlingService {
 
       if (exportingPageData.failed)
         return console.error({
-          time: new Date(),
-          level: "error",
           source: "PageDataStorage",
           message: exportingPageData.error.message,
           context: {
@@ -243,8 +276,6 @@ export default class CrawlingService {
         })
 
       console.info({
-        time: new Date(),
-        level: "info",
         source: "PageDataStorage",
         message: "export completed",
         context: {
@@ -255,8 +286,6 @@ export default class CrawlingService {
       await pageDataStore.close()
 
       console.info({
-        time: new Date(),
-        level: "info",
         source: "PageDataStorage",
         message: "storage closed",
         context: {
@@ -267,8 +296,6 @@ export default class CrawlingService {
       task.finishedAt = Date.now()
 
       console.info({
-        time: new Date(),
-        level: "info",
         source: "CrawlingService",
         message: `task completed`,
         context: task,
@@ -276,15 +303,25 @@ export default class CrawlingService {
     }, 100)
 
     console.info({
-      time: new Date(),
-      level: "info",
       source: "ApiServer",
       message: "task created",
       context: task,
     })
     this.#tasks[task.id] = task
 
+    if (Object.keys(this.#tasks).length > 100) {
+      for (const taskId in this.#tasks) {
+        const task = this.#tasks[taskId]
+        if (task && task.finishedAt) delete this.#tasks[taskId]
+        if (Object.keys(this.#tasks).length <= 100) break
+      }
+    }
+
     return task
+  }
+
+  async #listTasksHandler() {
+    return Object.values(this.#tasks)
   }
 
   // called by CrawlerPort for every crawled page
@@ -323,8 +360,6 @@ export default class CrawlingService {
     if (checkingDuplicate.data.isDuplicate) {
       task.duplicateCount++
       console.info({
-        time: new Date(),
-        level: "info",
         source: "PageDeduplicator",
         message: "duplicate found",
         context: {
@@ -377,8 +412,6 @@ export default class CrawlingService {
     task.pageCount++
 
     console.info({
-      time: new Date(),
-      level: "info",
       source: "PageDataStorage",
       message: "page stored",
       context: {
@@ -421,8 +454,6 @@ export default class CrawlingService {
     } while (resolvingGatewayUrl.data === input.failedUrl)
 
     console.warn({
-      time: new Date(),
-      level: "warning",
       source: "Crawler",
       message: input.errorMessages.pop()?.split("\n"),
       context: {

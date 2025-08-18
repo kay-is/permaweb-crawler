@@ -1,0 +1,257 @@
+<!doctype html>
+
+<meta charset="UTF-8" />
+<title>Create Crawling Task</title>
+<link rel="stylesheet" href="https://unpkg.com/almond.css@latest/dist/almond.min.css" />
+
+<h1>Permaweb Crawler Alpha</h1>
+
+<p>
+  This is bare-bones web interface for the Permaweb crawler. That allows creating new crawling tasks
+  and exploring the exported Parquet files with SQL.
+</p>
+<h2>Create a Crawling Task</h2>
+<form>
+  <div style="padding-bottom: 20px">
+    <label for="arnsNames">ArNS Names</label><br />
+    <input type="text" name="arnsNames" value="docs" required autofocus />
+  </div>
+  <div style="padding-bottom: 20px">
+    <label for="maxDepth">Max. Depth</label><br />
+    <input type="number" name="maxDepth" value="20" min="1" max="100" required />
+  </div>
+  <div style="padding-bottom: 20px">
+    <label for="maxPages">Max. Pages</label><br />
+    <input type="number" name="maxPages" value="500" min="1" max="10000" required />
+  </div>
+  <div style="padding-bottom: 20px">
+    <label for="maxPages">Similarity Threshold</label><br />
+    <input
+      type="number"
+      name="similarityThreshold"
+      value="0.9"
+      min="0.1"
+      max="1"
+      step="0.1"
+      required
+    />
+  </div>
+  <div style="padding-bottom: 20px">
+    <input type="checkbox" name="executeJs" />
+    <label for="executeJs">Execute JavaScript (slower)</label>
+  </div>
+  <div style="padding-bottom: 20px">
+    <input type="checkbox" name="extractHashUrls" />
+    <label for="extractHashUrls">Extract Hash-URLs</label>
+  </div>
+
+  <button type="submit">Start Crawling</button>
+  <button type="reset">Reset</button>
+</form>
+
+<script>
+  const form = document.querySelector("form")
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    const button = form.querySelector("button[type='submit']")
+    button.disabled = true
+
+    const formData = new FormData(form)
+
+    const taskConfig = {
+      arnsNames: [
+        ...formData
+          .get("arnsNames")
+          .split(",")
+          .map((name) => name.trim()),
+      ],
+      executeJavaScript: formData.get("executeJs") === "on",
+      extractHashUrls: formData.get("extractHashUrls") === "on",
+      similarityThreshold: parseFloat(formData.get("similarityThreshold")),
+      maxDepth: parseInt(formData.get("maxDepth")),
+      maxPages: parseInt(formData.get("maxPages")),
+    }
+
+    await callTRPC("POST", "/createTask", taskConfig)
+  })
+
+  async function callTRPC(method, endpoint, input = {}) {
+    const request = {
+      method,
+      headers: {
+        "content-type": "application/json",
+      },
+    }
+
+    if (method !== "GET") request.body = JSON.stringify(input)
+
+    try {
+      const response = await fetch(endpoint, request)
+
+      const data = await response.json()
+
+      if (data.error) throw new Error(data.error.message || "tRPC error")
+
+      return data.result
+    } catch (error) {
+      console.error("Request failed:", error)
+      throw error
+    }
+  }
+</script>
+
+<h2>Tasks</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Task ID</th>
+      <th>ARNs Names</th>
+      <th>Max Depth</th>
+      <th>Max Pages</th>
+      <th>Similarity Threshold</th>
+      <th>Execute JS</th>
+      <th>Extract Hash URLs</th>
+      <th>Status</th>
+      <th>Created At</th>
+      <th>Pages</th>
+      <th>Duration</th>
+    </tr>
+  </thead>
+  <tbody id="tasks">
+    <script type="module">
+      const listTasks = async () => {
+        const response = await callTRPC("GET", "/listTasks")
+        const tasks = response.data || []
+        const tbody = document.querySelector("#tasks")
+        tbody.innerHTML = ""
+
+        tasks.forEach((task) => {
+          const tr = document.createElement("tr")
+
+          const taskId = document.createElement("td")
+          taskId.textContent = task.id
+          tr.appendChild(taskId)
+
+          const arnsNames = document.createElement("td")
+          arnsNames.textContent = task.arnsNames.join(", ")
+          tr.appendChild(arnsNames)
+
+          const maxDepth = document.createElement("td")
+          maxDepth.textContent = task.maxDepth
+          tr.appendChild(maxDepth)
+
+          const maxPages = document.createElement("td")
+          maxPages.textContent = task.maxPages
+          tr.appendChild(maxPages)
+
+          const similarityThreshold = document.createElement("td")
+          similarityThreshold.textContent = task.similarityThreshold.toFixed(2)
+          tr.appendChild(similarityThreshold)
+
+          const executeJs = document.createElement("td")
+          executeJs.textContent = task.executeJavaScript ? "Yes" : "No"
+          tr.appendChild(executeJs)
+
+          const extractHashUrls = document.createElement("td")
+          extractHashUrls.textContent = task.extractHashUrls ? "Yes" : "No"
+          tr.appendChild(extractHashUrls)
+
+          const status = document.createElement("td")
+          status.textContent = task.error
+            ? task.error.message
+            : task.finishedAt
+              ? "Finished"
+              : "Running"
+          tr.appendChild(status)
+
+          const createdAt = document.createElement("td")
+          createdAt.textContent = new Date(task.createdAt).toLocaleString()
+          tr.appendChild(createdAt)
+
+          const crawledPages = document.createElement("td")
+          crawledPages.textContent = task.pageCount || 0
+          tr.appendChild(crawledPages)
+
+          const duration = document.createElement("td")
+          if (task.finishedAt) {
+            const durationMs = new Date(task.finishedAt) - new Date(task.createdAt)
+            const durationMin = (durationMs / 1000 / 60).toFixed(2)
+            duration.textContent = `${durationMin} minutes`
+          } else {
+            duration.textContent = "..."
+          }
+          tr.appendChild(duration)
+
+          tbody.appendChild(tr)
+        })
+      }
+
+      await listTasks()
+      setInterval(listTasks, 5000)
+    </script>
+  </tbody>
+</table>
+
+<h2>Exports</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>File Name</th>
+      <th>Last Modified</th>
+      <th>Size (KB)</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="exports">
+    <script type="module">
+      const listExports = async () => {
+        const response = await fetch("/exports/")
+        const { files } = await response.json()
+        const tbody = document.querySelector("#exports")
+
+        tbody.innerHTML = ""
+
+        files
+          .sort((a, b) => new Date(b.time) - new Date(a.time))
+          .forEach((file) => {
+            const tr = document.createElement("tr")
+
+            const fileName = document.createElement("td")
+            fileName.textContent = file.url.split("/").pop()
+            tr.appendChild(fileName)
+
+            const lastModified = document.createElement("td")
+            lastModified.textContent = new Date(file.time).toLocaleString()
+            tr.appendChild(lastModified)
+
+            const size = document.createElement("td")
+            size.textContent = (file.size / 1024).toFixed(2) + " KB"
+            tr.appendChild(size)
+
+            const actions = document.createElement("td")
+            const downloadLink = document.createElement("a")
+            downloadLink.href = file.url
+            downloadLink.textContent = "Download"
+            downloadLink.download = file.url.split("/").pop()
+            actions.appendChild(downloadLink)
+
+            const viewLink = document.createElement("a")
+            viewLink.href = "sql.html?file=" + encodeURIComponent(file.url)
+            viewLink.textContent = "View"
+            viewLink.style.marginLeft = "10px"
+            viewLink.target = "_blank"
+            actions.appendChild(viewLink)
+
+            tr.appendChild(actions)
+
+            tbody.appendChild(tr)
+          })
+      }
+
+      await listExports()
+      setInterval(listExports, 5000)
+    </script>
+  </tbody>
+</table>

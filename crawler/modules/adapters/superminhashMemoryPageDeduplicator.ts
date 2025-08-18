@@ -13,8 +13,6 @@ export default class SuperminhashMemoryPageDeduplicator
 
   async open(storageId: string, similarityThreshold: number) {
     console.info({
-      time: new Date(),
-      level: "info",
       source: "SuperminhashMemoryPageDeduplicator",
       message: "initializing",
       context: {

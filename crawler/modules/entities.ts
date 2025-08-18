@@ -48,6 +48,9 @@ export const crawlTaskConfigSchema = v.omit(crawlTaskSchema, [
 ])
 export type CrawlTaskConfig = v.InferInput<typeof crawlTaskConfigSchema>
 
+export const crawlTaskListSchema = v.array(crawlTaskSchema)
+export type CrawlTaskList = v.InferInput<typeof crawlTaskListSchema>
+
 export const htmlDataSchema = v.object({
   charset: v.string(),
   language: v.string(),
