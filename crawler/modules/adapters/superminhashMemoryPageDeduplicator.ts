@@ -2,6 +2,7 @@ import superminhash from "./superminhashWrapper.cjs"
 
 import * as Utils from "../utils.js"
 import type * as PageDeduplicator from "../ports/pageDeduplicator.js"
+import * as LoggingUtils from "./loggingUtils.js"
 
 const SIGNATURE_SIZE = 128
 const SEED = 1984
@@ -12,7 +13,7 @@ export default class SuperminhashMemoryPageDeduplicator
   #stores: Record<string, superminhash.SuperMinHash[]> = {}
 
   async open(storageId: string, similarityThreshold: number) {
-    console.info({
+    LoggingUtils.logInfo({
       source: "SuperminhashMemoryPageDeduplicator",
       message: "initializing",
       context: {
