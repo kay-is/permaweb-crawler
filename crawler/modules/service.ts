@@ -33,6 +33,7 @@ export interface CrawlingServiceConfig {
 
 export default class CrawlingService {
   #tasks: Record<string, Entities.CrawlTask> = {}
+  #runningTask?: Entities.CrawlTask
   #inputs: CrawlingServiceConfig["adapters"]["inputs"]
   #utils: CrawlingServiceConfig["adapters"]["utils"]
   #outputs: CrawlingServiceConfig["adapters"]["outputs"]
@@ -163,145 +164,6 @@ export default class CrawlingService {
       createdAt: Date.now(),
     }
 
-    const crawler = taskConfig.executeJavaScript
-      ? this.#inputs.crawlers["browser"]
-      : this.#inputs.crawlers["html"]
-
-    setTimeout(async () => {
-      const openingPageDataStore = await this.#outputs.pageDataStorage.open(task.id)
-
-      if (openingPageDataStore.failed)
-        return console.error({
-          source: "PageDataStorage",
-          message: openingPageDataStore.error.message,
-          context: {
-            taskId: task.id,
-          },
-        })
-
-      const pageDataStore = openingPageDataStore.data
-      this.#pageDataStores[task.id] = pageDataStore
-
-      const openingPageDuplicateStore = await this.#utils.pageDeduplicator.open(
-        task.id,
-        task.similarityThreshold,
-      )
-      if (openingPageDuplicateStore.failed)
-        return console.error({
-          source: "PageDeduplicator",
-          message: openingPageDuplicateStore.error.message,
-          context: {
-            taskId: task.id,
-            similarityThreshold: task.similarityThreshold,
-          },
-        })
-
-      this.#pageDeduplicateStores[task.id] = openingPageDuplicateStore.data
-
-      let initialRequests: Crawler.CrawlerRequest[] = []
-      for (const arnsName of taskConfig.arnsNames) {
-        const resolvingGatewayUrl = await this.#inputs.arnsResolver.resolve(arnsName)
-
-        if (resolvingGatewayUrl.failed)
-          return console.error({
-            source: "ArnsResolver",
-            message: resolvingGatewayUrl.error.message,
-            context: {
-              taskId: task.id,
-              arnsName,
-            },
-          })
-
-        const dissolvingWayfinderUrl = await this.#inputs.arnsResolver.dissolve(
-          resolvingGatewayUrl.data,
-        )
-
-        if (dissolvingWayfinderUrl.failed)
-          return console.error({
-            source: "ArnsResolver",
-            message: dissolvingWayfinderUrl.error.message,
-            context: {
-              taskId: task.id,
-              gatewayUrl: resolvingGatewayUrl.data,
-            },
-          })
-
-        initialRequests.push({
-          gatewayUrl: resolvingGatewayUrl.data,
-          wayfinderUrl: dissolvingWayfinderUrl.data,
-        })
-      }
-
-      const crawling = await crawler.start({
-        taskId: task.id,
-        initialRequests,
-        extractHashUrls: taskConfig.extractHashUrls,
-        maxDepth: taskConfig.maxDepth,
-        maxPages: taskConfig.maxPages,
-        pageInitHandler: this.#pageInitHandler,
-        pageDataHandler: this.#pageDataHandler.bind(this),
-        scrapingErrorHandler: this.#scrapingErrorHandler.bind(this),
-        resolveUrlHandler: this.#resolveUrlHandler.bind(this),
-      })
-      delete this.#pageDataStores[task.id]
-      delete this.#pageDeduplicateStores[task.id]
-
-      console.info({
-        source: "Crawler",
-        message: "crawling completed",
-        context: {
-          taskId: task.id,
-          pageCount: task.pageCount,
-          duplicateCount: task.duplicateCount,
-        },
-      })
-      if (crawling.failed)
-        return console.error({
-          source: "Crawler",
-          message: crawling.error.message,
-          context: {
-            taskId: task.id,
-          },
-        })
-
-      const exportingPageData = await pageDataStore.export()
-
-      if (exportingPageData.failed)
-        return console.error({
-          source: "PageDataStorage",
-          message: exportingPageData.error.message,
-          context: {
-            taskId: task.id,
-          },
-        })
-
-      console.info({
-        source: "PageDataStorage",
-        message: "export completed",
-        context: {
-          taskId: task.id,
-        },
-      })
-
-      await pageDataStore.close()
-
-      console.info({
-        source: "PageDataStorage",
-        message: "storage closed",
-        context: {
-          taskId: task.id,
-        },
-      })
-
-      task.finishedAt = Date.now()
-
-      console.info({
-        source: "CrawlingService",
-        message: `task completed`,
-        context: task,
-      })
-    }, 100)
-
     console.info({
       source: "ApiServer",
       message: "task created",
@@ -309,15 +171,174 @@ export default class CrawlingService {
     })
     this.#tasks[task.id] = task
 
-    if (Object.keys(this.#tasks).length > 100) {
-      for (const taskId in this.#tasks) {
-        const task = this.#tasks[taskId]
-        if (task && task.finishedAt) delete this.#tasks[taskId]
-        if (Object.keys(this.#tasks).length <= 100) break
-      }
+    if (!this.#runningTask) {
+      this.#runningTask = task
+      setTimeout(async () => this.#runTaskHandler(task), 10)
+    } else {
+      console.warn({
+        source: "CrawlingService",
+        message: "task already running, waiting for it to finish.",
+        context: {
+          taskId: task.id,
+          runningTaskId: this.#runningTask.id,
+          taskCount: Object.keys(this.#tasks).length,
+        },
+      })
     }
 
     return task
+  }
+
+  async #runTaskHandler(task: Entities.CrawlTask) {
+    console.info({
+      source: "CrawlingService",
+      message: `starting task`,
+      context: task,
+    })
+
+    const openingPageDataStore = await this.#outputs.pageDataStorage.open(task.id)
+
+    if (openingPageDataStore.failed)
+      return console.error({
+        source: "PageDataStorage",
+        message: openingPageDataStore.error.message,
+        context: {
+          taskId: task.id,
+        },
+      })
+
+    const pageDataStore = openingPageDataStore.data
+    this.#pageDataStores[task.id] = pageDataStore
+
+    const openingPageDuplicateStore = await this.#utils.pageDeduplicator.open(
+      task.id,
+      task.similarityThreshold,
+    )
+    if (openingPageDuplicateStore.failed)
+      return console.error({
+        source: "PageDeduplicator",
+        message: openingPageDuplicateStore.error.message,
+        context: {
+          taskId: task.id,
+          similarityThreshold: task.similarityThreshold,
+        },
+      })
+
+    this.#pageDeduplicateStores[task.id] = openingPageDuplicateStore.data
+
+    let initialRequests: Crawler.CrawlerRequest[] = []
+    for (const arnsName of task.arnsNames) {
+      const resolvingGatewayUrl = await this.#inputs.arnsResolver.resolve(arnsName)
+
+      if (resolvingGatewayUrl.failed)
+        return console.error({
+          source: "ArnsResolver",
+          message: resolvingGatewayUrl.error.message,
+          context: {
+            taskId: task.id,
+            arnsName,
+          },
+        })
+
+      const dissolvingWayfinderUrl = await this.#inputs.arnsResolver.dissolve(
+        resolvingGatewayUrl.data,
+      )
+
+      if (dissolvingWayfinderUrl.failed)
+        return console.error({
+          source: "ArnsResolver",
+          message: dissolvingWayfinderUrl.error.message,
+          context: {
+            taskId: task.id,
+            gatewayUrl: resolvingGatewayUrl.data,
+          },
+        })
+
+      initialRequests.push({
+        gatewayUrl: resolvingGatewayUrl.data,
+        wayfinderUrl: dissolvingWayfinderUrl.data,
+      })
+    }
+
+    const crawler = task.executeJavaScript
+      ? this.#inputs.crawlers["browser"]
+      : this.#inputs.crawlers["html"]
+
+    const crawling = await crawler.start({
+      taskId: task.id,
+      initialRequests,
+      extractHashUrls: task.extractHashUrls,
+      maxDepth: task.maxDepth,
+      maxPages: task.maxPages,
+      pageInitHandler: this.#pageInitHandler,
+      pageDataHandler: this.#pageDataHandler.bind(this),
+      scrapingErrorHandler: this.#scrapingErrorHandler.bind(this),
+      resolveUrlHandler: this.#resolveUrlHandler.bind(this),
+    })
+
+    console.info({
+      source: "Crawler",
+      message: "crawling completed",
+      context: {
+        taskId: task.id,
+        pageCount: task.pageCount,
+        duplicateCount: task.duplicateCount,
+      },
+    })
+
+    if (crawling.failed) {
+      task.error = crawling.error.message
+      return console.error({
+        source: "Crawler",
+        message: crawling.error.message,
+        context: { taskId: task.id },
+      })
+    }
+
+    const exportingPageData = await pageDataStore.export()
+
+    if (exportingPageData.failed) {
+      task.error = exportingPageData.error.message
+      return console.error({
+        source: "PageDataStorage",
+        message: exportingPageData.error.message,
+        context: { taskId: task.id },
+      })
+    }
+
+    console.info({
+      source: "PageDataStorage",
+      message: "export completed",
+      context: { taskId: task.id },
+    })
+
+    await pageDataStore.close()
+
+    console.info({
+      source: "PageDataStorage",
+      message: "storage closed",
+      context: { taskId: task.id },
+    })
+
+    task.finishedAt = Date.now()
+
+    console.info({
+      source: "CrawlingService",
+      message: `task completed`,
+      context: task,
+    })
+
+    const nextTask = Object.values(this.#tasks).find((t) => t.id !== task.id && !t.finishedAt)
+    if (nextTask) {
+      this.#runningTask = nextTask
+      setTimeout(async () => this.#runTaskHandler(nextTask), 10)
+    } else {
+      this.#runningTask = undefined
+      console.info({
+        source: "CrawlingService",
+        message: "no more tasks, service idle",
+      })
+    }
   }
 
   async #listTasksHandler() {
