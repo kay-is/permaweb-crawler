@@ -1,15 +1,16 @@
 {
   "name": "permaweb-crawler",
   "description": "A web crawler for the Permaweb.",
-  "version": "0.0.12",
+  "version": "0.1.24",
   "type": "module",
   "scripts": {
     "check": "tsc --noEmit",
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx modules/index.ts",
-    "build:docker": "docker build -t permaweb-crawler .",
-    "start:docker": "docker run -d -p 3000:3000 -v ./storage:/home/myuser/storage permaweb-crawler",
+    "build:docker": "docker build -t ghcr.io/kay-is/permaweb-crawler:0.1.24 .",
+    "push:docker": "docker push ghcr.io/kay-is/permaweb-crawler:0.1.24",
+    "start:docker": "docker run -d -p 3000:3000 -v ./storage:/home/myuser/storage ghcr.io/kay-is/permaweb-crawler:0.1.24",
     "dev:docker": "docker run -d -p 3000:3000 -v ./storage:/home/myuser/storage $(docker build -q .)",
     "prune:storage": "rm -rf storage/*"
   },
