@@ -3,6 +3,7 @@ import * as Crawlee from "crawlee"
 
 import * as Entities from "../entities.js"
 import type * as Crawler from "../ports/crawler.js"
+import * as LoggingUtils from "./loggingUtils.js"
 
 export type CustomRequestQueueConfig = {
   taskId: string
@@ -31,7 +32,7 @@ export const open = async (config: CustomRequestQueueConfig) => {
         | Entities.GatewayUrl
         | undefined
       if (!validUrl) {
-        console.warn({
+        LoggingUtils.logWarn({
           source: "CrawleeCustomRequestQueue",
           message: "Invalid URL",
           context: {
@@ -45,7 +46,7 @@ export const open = async (config: CustomRequestQueueConfig) => {
       const resolvedUrls = await config.resolveUrlHandler(validUrl)
 
       if (resolvedUrls.failed) {
-        console.warn({
+        LoggingUtils.logWarn({
           source: "CrawleeCustomRequestQueue",
           message: "Failed to resolve URL",
           context: {

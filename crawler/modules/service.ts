@@ -12,6 +12,8 @@ import type * as ArnsResolver from "./ports/arnsResolver.js"
 import type * as PageDataStorage from "./ports/pageDataStorage.js"
 import type * as WebServer from "./ports/webServer.js"
 import type * as PageDeduplicator from "./ports/pageDeduplicator.js"
+import * as CrawlerUtils from "./adapters/crawlerUtils.js"
+import * as LoggingUtils from "./adapters/loggingUtils.js"
 
 export interface CrawlingServiceConfig {
   adapters: {
@@ -74,17 +76,13 @@ export default class CrawlingService {
     })
 
     if (webServerStart.failed)
-      return console.error({ source: "WebServer", message: webServerStart.error.message })
+      return LoggingUtils.logError(LoggingUtils.createErrorLog("WebServer", webServerStart.error))
 
-    console.info({
-      source: "CrawlingService",
-      message: "service started",
-      context: {
-        apiServerUrl: "http://localhost:3000/",
-        webAppUrl: "http://localhost:3000/app/",
-        exportDataUrl: "http://localhost:3000/exports/",
-      },
-    })
+    LoggingUtils.logInfo(LoggingUtils.createServiceStartedLog({
+      apiServerUrl: "http://localhost:3000/",
+      webAppUrl: "http://localhost:3000/app/",
+      exportDataUrl: "http://localhost:3000/exports/",
+    }))
   }
 
   // called by WebServerPort
@@ -246,15 +244,11 @@ export default class CrawlingService {
       delete this.#pageDataStores[task.id]
       delete this.#pageDeduplicateStores[task.id]
 
-      console.info({
-        source: "Crawler",
-        message: "crawling completed",
-        context: {
-          taskId: task.id,
-          pageCount: task.pageCount,
-          duplicateCount: task.duplicateCount,
-        },
-      })
+      LoggingUtils.logInfo(LoggingUtils.createCrawlingCompletedLog(
+        task.id,
+        task.pageCount,
+        task.duplicateCount
+      ))
       if (crawling.failed)
         return console.error({
           source: "Crawler",
@@ -295,18 +289,10 @@ export default class CrawlingService {
 
       task.finishedAt = Date.now()
 
-      console.info({
-        source: "CrawlingService",
-        message: `task completed`,
-        context: task,
-      })
+      LoggingUtils.logInfo(LoggingUtils.createTaskCompletedLog(task))
     }, 100)
 
-    console.info({
-      source: "ApiServer",
-      message: "task created",
-      context: task,
-    })
+    LoggingUtils.logInfo(LoggingUtils.createTaskCreatedLog(task))
     this.#tasks[task.id] = task
 
     if (Object.keys(this.#tasks).length > 100) {
@@ -359,16 +345,12 @@ export default class CrawlingService {
     if (checkingDuplicate.failed) return Utils.error(checkingDuplicate.error)
     if (checkingDuplicate.data.isDuplicate) {
       task.duplicateCount++
-      console.info({
-        source: "PageDeduplicator",
-        message: "duplicate found",
-        context: {
-          taskId: task.id,
-          wayfinderUrl: pageData.wayfinderUrl,
-          duplicateCount: task.duplicateCount,
-          similarity: checkingDuplicate.data.similarity,
-        },
-      })
+      LoggingUtils.logInfo(LoggingUtils.createDuplicateFoundLog(
+        task.id,
+        pageData.wayfinderUrl,
+        task.duplicateCount,
+        checkingDuplicate.data.similarity
+      ))
       return Utils.empty()
     }
 
@@ -398,11 +380,9 @@ export default class CrawlingService {
         name: header.name.trim().toLowerCase(),
         value: header && header.value && header.value.trim ? header.value.trim().toLowerCase() : "",
       })),
-      relativeUrls: pageData.foundUrls
-        .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
+      relativeUrls: CrawlerUtils.getRelativeUrls(pageData.foundUrls)
         .map((url) => url.trim().toLowerCase()),
-      absoluteUrls: pageData.foundUrls
-        .filter((url) => !url.startsWith("/") && !url.startsWith("./") && !url.startsWith("#/"))
+      absoluteUrls: CrawlerUtils.getAbsoluteUrls(pageData.foundUrls)
         .map((url) => url.trim().toLowerCase()),
     })
 
@@ -411,15 +391,11 @@ export default class CrawlingService {
 
     task.pageCount++
 
-    console.info({
-      source: "PageDataStorage",
-      message: "page stored",
-      context: {
-        taskId: task.id,
-        wayfinderUrl: pageData.wayfinderUrl,
-        pageNumber: task.pageCount,
-      },
-    })
+    LoggingUtils.logInfo(LoggingUtils.createPageStoredLog(
+      task.id,
+      pageData.wayfinderUrl,
+      task.pageCount
+    ))
 
     return Utils.empty()
   }

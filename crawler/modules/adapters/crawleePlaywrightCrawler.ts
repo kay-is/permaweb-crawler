@@ -5,6 +5,8 @@ import * as Utils from "../utils.js"
 import * as Entities from "../entities.js"
 import type * as Crawler from "../ports/crawler.js"
 import * as CustomRequestQueue from "./crawleeCustomRequestQueue.js"
+import * as CrawlerUtils from "./crawlerUtils.js"
+import * as LoggingUtils from "./loggingUtils.js"
 
 Crawlee.log.setLevel(Crawlee.LogLevel.SOFT_FAIL)
 
@@ -18,11 +20,7 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
 
   async start(config: Crawler.CrawlerConfig) {
     return Utils.tryCatch(async () => {
-      console.info({
-        source: "CrawleePlaywrightCrawler",
-        message: "starting",
-        context: config,
-      })
+      LoggingUtils.logInfo(LoggingUtils.createCrawlerStartLog("CrawleePlaywrightCrawler", config))
 
       this.#taskId = config.taskId
       this.#extractHashUrls = config.extractHashUrls
@@ -76,26 +74,25 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
       .evaluateAll((anchors) =>
         anchors
           .map((anchor) => decodeURIComponent(anchor.getAttribute("href") ?? ""))
-          .filter((url) => url !== "/" && !!url),
       )
 
-    if (!this.#extractHashUrls)
-      foundUrls = foundUrls.map((url) => url.split("#").shift() ?? "").filter((url) => !!url)
+    foundUrls = CrawlerUtils.filterUrls(foundUrls, { extractHashUrls: this.#extractHashUrls })
 
     // requires a locator() call for client-side rendered pages
     const html = await context.page.content()
     const headers = (await context.response?.allHeaders()) ?? {}
-    const headersArray = Object.entries(headers).map(([name, value]) => ({ name, value }))
+    const headersArray = CrawlerUtils.convertHeadersToArray(headers)
 
-    const handlingPageData = await this.#pageDataHandler({
-      taskId: this.#taskId,
-      arnsName: context.request.uniqueKey.split("/")[2] ?? "",
-      wayfinderUrl: context.request.uniqueKey as Entities.WayfinderUrl,
-      gatewayUrl: context.request.url as Entities.GatewayUrl,
+    const pageData = CrawlerUtils.createPageData(
+      this.#taskId,
+      context.request.uniqueKey,
+      context.request.url,
       html,
       foundUrls,
-      headers: headersArray,
-    })
+      headersArray
+    )
+
+    const handlingPageData = await this.#pageDataHandler(pageData)
 
     if (handlingPageData.failed) throw handlingPageData.error
 
@@ -105,17 +102,12 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   async #playwrightErrorHandler(context: Crawlee.BrowserCrawlingContext) {
     if (!this.#scrapingErrorHandler) throw new Error("scrapingErrorHandler not set")
 
-    const { url, retryCount, maxRetries, errorMessages } = context.request
-    const resolvingNewUrl = await this.#scrapingErrorHandler({
-      taskId: this.#taskId!,
-      failedUrl: url as Entities.GatewayUrl,
-      retryCount,
-      maxRetries: maxRetries ?? 0,
-      errorMessages,
-    })
+    const newUrl = await CrawlerUtils.handleCrawlerError(
+      context,
+      this.#taskId!,
+      this.#scrapingErrorHandler
+    )
 
-    if (resolvingNewUrl.failed) throw resolvingNewUrl.error
-
-    context.request.url = resolvingNewUrl.data
+    context.request.url = newUrl
   }
 }
