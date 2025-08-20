@@ -34,11 +34,12 @@ export interface CrawlingServiceConfig {
 export default class CrawlingService {
   #log = Utils.getLogger("CrawlingService")
 
-  #tasks: Record<string, Entities.CrawlTask> = {}
-  #runningTask?: Entities.CrawlTask
   #inputs: CrawlingServiceConfig["adapters"]["inputs"]
   #utils: CrawlingServiceConfig["adapters"]["utils"]
   #outputs: CrawlingServiceConfig["adapters"]["outputs"]
+
+  #tasks: Record<string, Entities.CrawlTask> = {}
+  #runningTask?: Entities.CrawlTask
 
   #pageDataStores: Record<string, PageDataStorage.PageDataStore> = {}
   #pageDeduplicateStores: Record<string, PageDeduplicator.PageDuplicateStore> = {}
@@ -75,7 +76,7 @@ export default class CrawlingService {
     if (webServerStart.failed) return this.#log.error(webServerStart.error.message)
 
     this.#log.info({
-      msg: "started",
+      msg: "service started",
       apiServerUrl: "http://localhost:3000/",
       webAppUrl: "http://localhost:3000/app/",
       exportDataUrl: "http://localhost:3000/exports/",
@@ -173,6 +174,7 @@ export default class CrawlingService {
 
   async #runTaskHandler(task: Entities.CrawlTask) {
     this.#log.info({ msg: "starting task", taskId: task.id })
+    task.startedAt = Date.now()
 
     const openingPageDataStore = await this.#outputs.pageDataStorage.open(task.id)
 
@@ -259,7 +261,7 @@ export default class CrawlingService {
 
     this.#log.info({
       msg: "task completed",
-      ctaskId: task.id,
+      taskId: task.id,
       pageCount: task.pageCount,
       duplicateCount: task.duplicateCount,
     })
@@ -313,7 +315,7 @@ export default class CrawlingService {
     if (checkingDuplicate.failed) return Utils.error(checkingDuplicate.error)
     if (checkingDuplicate.data.isDuplicate) {
       task.duplicateCount++
-      this.#log.warn({
+      this.#log.debug({
         msg: "duplicate found",
         taskId: task.id,
         wayfinderUrl: pageData.wayfinderUrl,
@@ -323,38 +325,43 @@ export default class CrawlingService {
       return Utils.empty()
     }
 
-    const arweaveTxId = pageData.headers.find(
+    const resolvedTxId = pageData.headers.find(
       (header) => header.name === "x-arns-resolved-id",
     )?.value
-    if (!arweaveTxId) return Utils.error(new Error(`x-arns-resolved-id header missing`))
+    if (!resolvedTxId) return Utils.error(new Error(`x-arns-resolved-id header missing`))
 
-    // sort found URLs, but don't use local compare, the sorting needs to be stable across different environments
     pageData.foundUrls.sort((a, b) =>
       a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
     )
 
+    const store = this.#pageDataStores[pageData.taskId]
+    if (!store) return Utils.error(new Error("Store not found for " + pageData.taskId))
+
+    const relativeUrls = pageData.foundUrls
+      .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
+      .map((url) => url.trim().toLowerCase())
+
+    const absoluteUrls = pageData.foundUrls
+      .filter((url) => !url.startsWith("/") && !url.startsWith("./") && !url.startsWith("#/"))
+      .map((url) => url.trim().toLowerCase())
+
     pageData.headers.sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
     )
+    const headers = pageData.headers.map((header) => ({
+      name: header.name.trim().toLowerCase(),
+      value: header.value.trim().toLowerCase(),
+    }))
 
-    const store = this.#pageDataStores[pageData.taskId]
-    if (!store) return Utils.error(new Error("Store not found for " + pageData.taskId))
     const storingPageData = await store.save({
       ...extractingHtmlData.data,
-      txId: arweaveTxId,
+      txId: resolvedTxId,
       arnsName: pageData.arnsName.trim().toLowerCase(),
       wayfinderUrl: pageData.wayfinderUrl.trim().toLowerCase(),
       gatewayUrl: pageData.gatewayUrl.trim().toLowerCase(),
-      headers: pageData.headers.map((header) => ({
-        name: header.name.trim().toLowerCase(),
-        value: header && header.value && header.value.trim ? header.value.trim().toLowerCase() : "",
-      })),
-      relativeUrls: pageData.foundUrls
-        .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
-        .map((url) => url.trim().toLowerCase()),
-      absoluteUrls: pageData.foundUrls
-        .filter((url) => !url.startsWith("/") && !url.startsWith("./") && !url.startsWith("#/"))
-        .map((url) => url.trim().toLowerCase()),
+      headers,
+      absoluteUrls,
+      relativeUrls,
     })
 
     // causes the crawler to retry the URL

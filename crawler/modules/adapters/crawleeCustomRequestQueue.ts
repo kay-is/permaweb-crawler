@@ -41,11 +41,7 @@ export const open = async (config: CustomRequestQueueConfig) => {
       const resolvedUrls = await config.resolveUrlHandler(validUrl)
 
       if (resolvedUrls.failed) {
-        log.warn({
-          msg: resolvedUrls.error.message,
-          taskId: config.taskId,
-          gatewayUrl: validUrl,
-        })
+        log.warn({ msg: resolvedUrls.error.message, taskId: config.taskId, gatewayUrl: validUrl })
         continue
       }
 

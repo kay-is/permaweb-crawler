@@ -19,20 +19,19 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   #scrapingErrorHandler?: Crawler.CrawlerScrapingErrorHandler
 
   async start(config: Crawler.CrawlerConfig) {
-    return Utils.tryCatch(async () => {
-      this.#log.debug({ msg: "starting crawler", config })
+    this.#log.debug({ msg: "starting crawler", config })
 
-      this.#taskId = config.taskId
-      this.#extractHashUrls = config.extractHashUrls
+    this.#taskId = config.taskId
+    this.#extractHashUrls = config.extractHashUrls
 
-      const customRequestQueue = await CustomRequestQueue.open(config)
+    const customRequestQueue = await CustomRequestQueue.open(config)
 
-      this.#pageInitHandler = config.pageInitHandler
-      this.#pageDataHandler = config.pageDataHandler
-      this.#scrapingErrorHandler = config.scrapingErrorHandler
+    this.#pageInitHandler = config.pageInitHandler
+    this.#pageDataHandler = config.pageDataHandler
+    this.#scrapingErrorHandler = config.scrapingErrorHandler
 
+    const crawling = await Utils.tryCatch(async () => {
       const crawler = new Crawlee.PlaywrightCrawler({
-        sameDomainDelaySecs: 1,
         navigationTimeoutSecs: 10,
         requestQueue: customRequestQueue,
         maxConcurrency: 5,
@@ -40,23 +39,24 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
         respectRobotsTxtFile: true,
         maxCrawlDepth: config.maxDepth,
         maxRequestsPerCrawl: config.maxPages,
-        launchContext: {
-          launcher: Playwright.chromium,
-        },
+        launchContext: { launcher: Playwright.chromium },
         requestHandler: this.#playwrightRequestHandler.bind(this),
         errorHandler: this.#playwrightErrorHandler.bind(this),
       })
+      // the crawler only understands HTTP/gatway URLs, but accepts any string as uniqueKey
+      const initialRequests = config.initialRequests.map(({ gatewayUrl, wayfinderUrl }) => ({
+        url: gatewayUrl,
+        uniqueKey: wayfinderUrl,
+      }))
 
-      const result = await crawler.run(
-        // the crawler only understands HTTP/gatway URLs, but accepts any string as uniqueKey
-        config.initialRequests.map(({ gatewayUrl, wayfinderUrl }) => ({
-          url: gatewayUrl,
-          uniqueKey: wayfinderUrl,
-        })),
-      )
-
-      this.#log.info({ msg: "crawler finished", ...result })
+      return await crawler.run(initialRequests)
     })
+
+    if (crawling.failed) return crawling
+
+    this.#log.info({ msg: "crawler finished", ...crawling.data })
+
+    return Utils.empty()
   }
 
   async #playwrightRequestHandler(context: Crawlee.PlaywrightCrawlingContext) {

@@ -42,7 +42,7 @@ export async function tryCatch<TData, TError extends { message: string } = Error
 import pino from "pino"
 
 const logger = pino({
-  level: "debug",
+  level: "info",
   formatters: {
     log(obj: any) {
       if (Array.isArray(obj.msg)) {

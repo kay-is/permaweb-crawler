@@ -18,16 +18,16 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
   #scrapingErrorHandler?: Crawler.CrawlerScrapingErrorHandler
 
   async start(config: Crawler.CrawlerConfig) {
-    return Utils.tryCatch(async () => {
-      this.#log.debug({ msg: "starting crawler", config })
+    this.#log.debug({ msg: "starting crawler", config })
 
-      this.#taskId = config.taskId
-      this.#extractHashUrls = config.extractHashUrls
+    this.#taskId = config.taskId
+    this.#extractHashUrls = config.extractHashUrls
 
+    this.#pageDataHandler = config.pageDataHandler
+    this.#scrapingErrorHandler = config.scrapingErrorHandler
+
+    const result = await Utils.tryCatch(async () => {
       const customRequestQueue = await CustomRequestQueue.open(config)
-
-      this.#pageDataHandler = config.pageDataHandler
-      this.#scrapingErrorHandler = config.scrapingErrorHandler
 
       const crawler = new Crawlee.BasicCrawler({
         requestHandlerTimeoutSecs: 5,
@@ -41,22 +41,24 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
         errorHandler: this.#basicErrorHandler.bind(this),
       })
 
-      const result = await crawler.run(
-        // the crawler only understands HTTP/gatway URLs, but accepts any string as uniqueKey
-        config.initialRequests.map(({ gatewayUrl, wayfinderUrl }) => ({
-          url: gatewayUrl,
-          uniqueKey: wayfinderUrl,
-        })),
-      )
+      // the crawler only understands HTTP/gatway URLs, but accepts any string as uniqueKey
+      const initialRequests = config.initialRequests.map(({ gatewayUrl, wayfinderUrl }) => ({
+        url: gatewayUrl,
+        uniqueKey: wayfinderUrl,
+      }))
 
-      this.#log.info({ msg: "crawler finished", ...result })
+      return await crawler.run(initialRequests)
     })
+
+    if (result.failed) return result
+
+    this.#log.info({ msg: "crawler finished", ...result.data })
+
+    return Utils.empty()
   }
 
+  // called by Crawlee for each request
   async #basicRequestHandler(context: Crawlee.BasicCrawlingContext) {
-    if (!this.#taskId) throw new Error("taskId not set!")
-    if (!this.#pageDataHandler) throw new Error("pageDataHandler not set!")
-
     const response = await context.sendRequest()
     const dom = NodeHtmlParser.parse(response.body)
 
@@ -71,27 +73,25 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
     if (!this.#extractHashUrls)
       foundUrls = foundUrls.map((url) => url.split("#").shift() ?? "").filter((url) => !!url)
 
-    const html = response.body
     const headers = response.headers ?? {}
-
     for (const header in headers) if (headers[header] === undefined) delete headers[header]
 
     const headersArray = Object.entries(headers).map(([name, value]) => ({
       name,
-      value: value as string,
+      value: "" + value,
     }))
 
-    const handlingPageData = await this.#pageDataHandler({
-      taskId: this.#taskId,
+    const handlingPageData = await this.#pageDataHandler?.({
+      taskId: this.#taskId ?? "N/A",
       arnsName: context.request.uniqueKey.split("/")[2] ?? "",
       wayfinderUrl: context.request.uniqueKey as Entities.WayfinderUrl,
       gatewayUrl: context.request.url as Entities.GatewayUrl,
-      html,
+      html: response.body,
       foundUrls,
       headers: headersArray,
     })
 
-    if (handlingPageData.failed) throw handlingPageData.error
+    if (handlingPageData?.failed) throw handlingPageData.error
 
     const relativeUrls = foundUrls
       .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
@@ -101,10 +101,8 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
   }
 
   async #basicErrorHandler(context: Crawlee.BasicCrawlingContext) {
-    if (!this.#scrapingErrorHandler) throw new Error("scrapingErrorHandler not set")
-
     const { url, retryCount, maxRetries, errorMessages } = context.request
-    const resolvingNewUrl = await this.#scrapingErrorHandler({
+    const resolvingNewUrl = await this.#scrapingErrorHandler?.({
       taskId: this.#taskId!,
       failedUrl: url as Entities.GatewayUrl,
       retryCount,
@@ -112,8 +110,7 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
       errorMessages,
     })
 
-    if (resolvingNewUrl.failed) throw resolvingNewUrl.error
-
-    context.request.url = resolvingNewUrl.data
+    if (resolvingNewUrl?.failed) throw resolvingNewUrl.error
+    if (resolvingNewUrl?.data) context.request.url = resolvingNewUrl.data
   }
 }

@@ -22,17 +22,17 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
   #log = Utils.getLogger("DuckdbPageDataStorage")
 
   async open(storageId: string) {
-    return Utils.tryCatch(async () => {
-      const dbPath = path.join(DATABASE_PATH, `${storageId}.duckdb`)
-      this.#log.debug({ msg: "opening database", storageId, databasePath: dbPath })
+    const dbPath = path.join(DATABASE_PATH, `${storageId}.duckdb`)
+    this.#log.debug({ msg: "opening database", storageId, databasePath: dbPath })
 
-      await fs.mkdir(DATABASE_PATH, { recursive: true })
-      const duckdbInstance = await Duckdb.DuckDBInstance.create(dbPath)
-      const duckdb = await duckdbInstance.connect()
+    await fs.mkdir(DATABASE_PATH, { recursive: true })
+    const duckdbInstance = await Duckdb.DuckDBInstance.create(dbPath)
+    const duckdb = await duckdbInstance.connect()
 
-      const detailsTableName = "details"
-      const htmlTableName = "html"
+    const detailsTableName = "details"
+    const htmlTableName = "html"
 
+    const initializingTables = await Utils.tryCatch(async () => {
       await duckdb.run(`
         CREATE TABLE IF NOT EXISTS ${detailsTableName} (
           htmlHash VARCHAR PRIMARY KEY,
@@ -61,67 +61,69 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `)
+    })
 
-      return {
-        save: (data: Entities.PageData) =>
-          Utils.tryCatch(async () => {
-            const htmlHash = crypto.createHash("sha256").update(data.normalizedHtml).digest("hex")
+    if (initializingTables.failed) return initializingTables
 
-            await duckdb.run(
-              `
+    return Utils.ok({
+      save: (data: Entities.PageData) =>
+        Utils.tryCatch(async () => {
+          const htmlHash = crypto.createHash("sha256").update(data.normalizedHtml).digest("hex")
+
+          await duckdb.run(
+            `
             INSERT INTO ${detailsTableName}
             (arnsName, wayfinderUrl, gatewayUrl, txId, charset, language, title, description, 
             headers, absoluteUrls, relativeUrls, openGraph, htmlHash)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
-              [
-                data.arnsName,
-                data.wayfinderUrl,
-                data.gatewayUrl,
-                data.txId,
-                data.charset,
-                data.language,
-                data.title,
-                data.description,
-                nullOrMap(data.headers, ({ name, value }) => ({ key: name, value })),
-                nullOrList(data.absoluteUrls),
-                nullOrList(data.relativeUrls),
-                nullOrMap(data.openGraph, ({ property, content }) => ({
-                  key: property,
-                  value: content,
-                })),
-                htmlHash,
-              ],
-            )
+            [
+              data.arnsName,
+              data.wayfinderUrl,
+              data.gatewayUrl,
+              data.txId,
+              data.charset,
+              data.language,
+              data.title,
+              data.description,
+              nullOrMap(data.headers, ({ name, value }) => ({ key: name, value })),
+              nullOrList(data.absoluteUrls),
+              nullOrList(data.relativeUrls),
+              nullOrMap(data.openGraph, ({ property, content }) => ({
+                key: property,
+                value: content,
+              })),
+              htmlHash,
+            ],
+          )
 
-            await duckdb.run(
-              `
+          await duckdb.run(
+            `
             INSERT INTO ${htmlTableName}
             (htmlHash, normalizedHtml)
             VALUES (?, ?)
             `,
-              [htmlHash, data.normalizedHtml],
-            )
-          }),
-        export: () =>
-          Utils.tryCatch(async () => {
-            await fs.mkdir(EXPORTS_PATH, { recursive: true })
+            [htmlHash, data.normalizedHtml],
+          )
+        }),
+      export: () =>
+        Utils.tryCatch(async () => {
+          await fs.mkdir(EXPORTS_PATH, { recursive: true })
 
-            await duckdb.run(`
+          await duckdb.run(`
               COPY ${detailsTableName}
               TO '${path.join(EXPORTS_PATH, `${storageId}-details.parquet`)}' (FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 10);
               
               COPY ${htmlTableName} 
               TO '${path.join(EXPORTS_PATH, `${storageId}-html.parquet`)}' (FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 10);
             `)
-          }),
-        close: () =>
-          Utils.tryCatch(async () => {
-            duckdb.closeSync()
-            await fs.unlink(path.join(DATABASE_PATH, `${storageId}.duckdb`))
-            this.#log.debug({ msg: "closed and deleted database", storageId, databasePath: dbPath })
-          }),
-      }
+        }),
+      close: () =>
+        Utils.tryCatch(async () => {
+          duckdb.closeSync()
+          await fs.unlink(path.join(DATABASE_PATH, `${storageId}.duckdb`))
+          this.#log.debug({ msg: "closed and deleted database", storageId, databasePath: dbPath })
+        }),
     })
   }
 }

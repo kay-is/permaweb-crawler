@@ -29,24 +29,28 @@ export default class NetworkWayfinderArnsResolver implements ArnsResolver.ArnsRe
   }
 
   async resolve(urlOrArnsName: Entities.WayfinderUrl | Entities.ArnsName) {
-    return Utils.tryCatch(async () => {
-      const config = urlOrArnsName.startsWith("ar://")
-        ? { wayfinderUrl: urlOrArnsName as Entities.WayfinderUrl }
-        : { arnsName: urlOrArnsName }
+    const config = urlOrArnsName.startsWith("ar://")
+      ? { wayfinderUrl: urlOrArnsName as Entities.WayfinderUrl }
+      : { arnsName: urlOrArnsName }
 
-      const resolvedUrl = await this.#wayfinder.resolveUrl(config)
-      return decodeURIComponent(resolvedUrl.toString()) as Entities.GatewayUrl
-    })
+    const resolvingUrl = await Utils.tryCatch(() => this.#wayfinder.resolveUrl(config))
+
+    if (resolvingUrl.failed) return resolvingUrl
+
+    const resolvedUrl = decodeURIComponent(resolvingUrl.data.toString()) as Entities.GatewayUrl
+
+    return Utils.ok(resolvedUrl)
   }
 
   async dissolve(url: Entities.GatewayUrl | URL) {
-    return Utils.tryCatch(async () => {
-      const wayfinderUrl = new URL(url)
-      wayfinderUrl.hostname = wayfinderUrl.hostname.split(".").shift() as string
-      return wayfinderUrl
-        .toString()
-        .replace("http:", "ar:")
-        .replace("https:", "ar:") as Entities.WayfinderUrl
-    })
+    const wayfinderUrl = new URL(url)
+    wayfinderUrl.hostname = wayfinderUrl.hostname.split(".").shift() as string
+
+    const dissolvedUrl = wayfinderUrl
+      .toString()
+      .replace("http:", "ar:")
+      .replace("https:", "ar:") as Entities.WayfinderUrl
+
+    return Utils.ok(dissolvedUrl)
   }
 }

@@ -162,7 +162,9 @@
             ? task.error.message
             : task.finishedAt
               ? "Finished"
-              : "Running"
+              : task.startedAt
+                ? "Running"
+                : "Waiting"
           tr.appendChild(status)
 
           const createdAt = document.createElement("td")
@@ -175,7 +177,7 @@
 
           const duration = document.createElement("td")
           if (task.finishedAt) {
-            const durationMs = new Date(task.finishedAt) - new Date(task.createdAt)
+            const durationMs = new Date(task.finishedAt) - new Date(task.startedAt)
             const durationMin = (durationMs / 1000 / 60).toFixed(2)
             duration.textContent = `${durationMin} minutes`
           } else {

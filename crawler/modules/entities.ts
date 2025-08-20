@@ -34,6 +34,7 @@ export const crawlTaskSchema = v.object({
   duplicateCount: v.number(),
   error: v.optional(v.string()),
   createdAt: v.number(),
+  startedAt: v.optional(v.number()),
   finishedAt: v.optional(v.number()),
 })
 export type CrawlTask = v.InferInput<typeof crawlTaskSchema>
