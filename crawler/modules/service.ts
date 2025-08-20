@@ -32,6 +32,8 @@ export interface CrawlingServiceConfig {
 }
 
 export default class CrawlingService {
+  #log = Utils.getLogger("CrawlingService")
+
   #tasks: Record<string, Entities.CrawlTask> = {}
   #runningTask?: Entities.CrawlTask
   #inputs: CrawlingServiceConfig["adapters"]["inputs"]
@@ -61,11 +63,7 @@ export default class CrawlingService {
       },
     })
 
-    if (apiServerStart.failed)
-      return console.error({
-        source: "ApiServer",
-        message: apiServerStart.error.message,
-      })
+    if (apiServerStart.failed) return this.#log.error(apiServerStart.error.message)
 
     this.#apiServerHandler = apiServerStart.data
 
@@ -74,17 +72,13 @@ export default class CrawlingService {
       requestHandler: this.#webServerHandler.bind(this),
     })
 
-    if (webServerStart.failed)
-      return console.error({ source: "WebServer", message: webServerStart.error.message })
+    if (webServerStart.failed) return this.#log.error(webServerStart.error.message)
 
-    console.info({
-      source: "CrawlingService",
-      message: "service started",
-      context: {
-        apiServerUrl: "http://localhost:3000/",
-        webAppUrl: "http://localhost:3000/app/",
-        exportDataUrl: "http://localhost:3000/exports/",
-      },
+    this.#log.info({
+      msg: "started",
+      apiServerUrl: "http://localhost:3000/",
+      webAppUrl: "http://localhost:3000/app/",
+      exportDataUrl: "http://localhost:3000/exports/",
     })
   }
 
@@ -108,10 +102,7 @@ export default class CrawlingService {
       try {
         return fs.createReadStream(filePath).pipe(response)
       } catch (error: any) {
-        console.error({
-          source: "WebServer",
-          message: `Error reading file ${filePath}: ${error.message}`,
-        })
+        this.#log.error(error.message)
         response.statusCode = 404
         return response.end("File not found")
       }
@@ -142,10 +133,7 @@ export default class CrawlingService {
       try {
         return fs.createReadStream(filePath).pipe(response)
       } catch (error: any) {
-        console.error({
-          source: "WebServer",
-          message: `Error reading file ${filePath}: ${error.message}`,
-        })
+        this.#log.error(error.message)
         response.statusCode = 404
         return response.end("File not found")
       }
@@ -164,25 +152,19 @@ export default class CrawlingService {
       createdAt: Date.now(),
     }
 
-    console.info({
-      source: "ApiServer",
-      message: "task created",
-      context: task,
-    })
     this.#tasks[task.id] = task
+
+    this.#log.info({ msg: "task created", taskId: task.id })
 
     if (!this.#runningTask) {
       this.#runningTask = task
       setTimeout(async () => this.#runTaskHandler(task), 10)
     } else {
-      console.warn({
-        source: "CrawlingService",
-        message: "task already running, waiting for it to finish.",
-        context: {
-          taskId: task.id,
-          runningTaskId: this.#runningTask.id,
-          taskCount: Object.keys(this.#tasks).length,
-        },
+      this.#log.info({
+        msg: "task queued",
+        taskId: task.id,
+        runningTaskId: this.#runningTask.id,
+        taskCount: Object.keys(this.#tasks).length,
       })
     }
 
@@ -190,22 +172,12 @@ export default class CrawlingService {
   }
 
   async #runTaskHandler(task: Entities.CrawlTask) {
-    console.info({
-      source: "CrawlingService",
-      message: `starting task`,
-      context: task,
-    })
+    this.#log.info({ msg: "starting task", taskId: task.id })
 
     const openingPageDataStore = await this.#outputs.pageDataStorage.open(task.id)
 
     if (openingPageDataStore.failed)
-      return console.error({
-        source: "PageDataStorage",
-        message: openingPageDataStore.error.message,
-        context: {
-          taskId: task.id,
-        },
-      })
+      return this.#log.error({ msg: openingPageDataStore.error.message, taskId: task.id })
 
     const pageDataStore = openingPageDataStore.data
     this.#pageDataStores[task.id] = pageDataStore
@@ -215,13 +187,10 @@ export default class CrawlingService {
       task.similarityThreshold,
     )
     if (openingPageDuplicateStore.failed)
-      return console.error({
-        source: "PageDeduplicator",
-        message: openingPageDuplicateStore.error.message,
-        context: {
-          taskId: task.id,
-          similarityThreshold: task.similarityThreshold,
-        },
+      return this.#log.error({
+        msg: openingPageDuplicateStore.error.message,
+        taskId: task.id,
+        similarityThreshold: task.similarityThreshold,
       })
 
     this.#pageDeduplicateStores[task.id] = openingPageDuplicateStore.data
@@ -231,13 +200,10 @@ export default class CrawlingService {
       const resolvingGatewayUrl = await this.#inputs.arnsResolver.resolve(arnsName)
 
       if (resolvingGatewayUrl.failed)
-        return console.error({
-          source: "ArnsResolver",
-          message: resolvingGatewayUrl.error.message,
-          context: {
-            taskId: task.id,
-            arnsName,
-          },
+        return this.#log.error({
+          msg: resolvingGatewayUrl.error.message,
+          taskId: task.id,
+          arnsName,
         })
 
       const dissolvingWayfinderUrl = await this.#inputs.arnsResolver.dissolve(
@@ -245,13 +211,10 @@ export default class CrawlingService {
       )
 
       if (dissolvingWayfinderUrl.failed)
-        return console.error({
-          source: "ArnsResolver",
-          message: dissolvingWayfinderUrl.error.message,
-          context: {
-            taskId: task.id,
-            gatewayUrl: resolvingGatewayUrl.data,
-          },
+        return this.#log.error({
+          msg: dissolvingWayfinderUrl.error.message,
+          taskId: task.id,
+          gatewayUrl: resolvingGatewayUrl.data,
         })
 
       initialRequests.push({
@@ -276,68 +239,38 @@ export default class CrawlingService {
       resolveUrlHandler: this.#resolveUrlHandler.bind(this),
     })
 
-    console.info({
-      source: "Crawler",
-      message: "crawling completed",
-      context: {
-        taskId: task.id,
-        pageCount: task.pageCount,
-        duplicateCount: task.duplicateCount,
-      },
-    })
-
     if (crawling.failed) {
       task.error = crawling.error.message
-      return console.error({
-        source: "Crawler",
-        message: crawling.error.message,
-        context: { taskId: task.id },
-      })
+      return this.#log.error({ msg: crawling.error.message, taskId: task.id })
     }
 
     const exportingPageData = await pageDataStore.export()
 
     if (exportingPageData.failed) {
       task.error = exportingPageData.error.message
-      return console.error({
-        source: "PageDataStorage",
-        message: exportingPageData.error.message,
-        context: { taskId: task.id },
-      })
+      return this.#log.error({ msg: exportingPageData.error.message, taskId: task.id })
     }
-
-    console.info({
-      source: "PageDataStorage",
-      message: "export completed",
-      context: { taskId: task.id },
-    })
 
     await pageDataStore.close()
 
-    console.info({
-      source: "PageDataStorage",
-      message: "storage closed",
-      context: { taskId: task.id },
-    })
+    this.#log.debug({ msg: "export completed", taskId: task.id })
 
     task.finishedAt = Date.now()
 
-    console.info({
-      source: "CrawlingService",
-      message: `task completed`,
-      context: task,
+    this.#log.info({
+      msg: "task completed",
+      ctaskId: task.id,
+      pageCount: task.pageCount,
+      duplicateCount: task.duplicateCount,
     })
 
     const nextTask = Object.values(this.#tasks).find((t) => t.id !== task.id && !t.finishedAt)
     if (nextTask) {
       this.#runningTask = nextTask
-      setTimeout(async () => this.#runTaskHandler(nextTask), 10)
+      setTimeout(async () => await this.#runTaskHandler(nextTask), 10)
     } else {
       this.#runningTask = undefined
-      console.info({
-        source: "CrawlingService",
-        message: "no more tasks, service idle",
-      })
+      this.#log.info("no more tasks, service idle")
     }
   }
 
@@ -380,15 +313,12 @@ export default class CrawlingService {
     if (checkingDuplicate.failed) return Utils.error(checkingDuplicate.error)
     if (checkingDuplicate.data.isDuplicate) {
       task.duplicateCount++
-      console.info({
-        source: "PageDeduplicator",
-        message: "duplicate found",
-        context: {
-          taskId: task.id,
-          wayfinderUrl: pageData.wayfinderUrl,
-          duplicateCount: task.duplicateCount,
-          similarity: checkingDuplicate.data.similarity,
-        },
+      this.#log.warn({
+        msg: "duplicate found",
+        taskId: task.id,
+        wayfinderUrl: pageData.wayfinderUrl,
+        duplicateCount: task.duplicateCount,
+        similarity: checkingDuplicate.data.similarity,
       })
       return Utils.empty()
     }
@@ -432,14 +362,11 @@ export default class CrawlingService {
 
     task.pageCount++
 
-    console.info({
-      source: "PageDataStorage",
-      message: "page stored",
-      context: {
-        taskId: task.id,
-        wayfinderUrl: pageData.wayfinderUrl,
-        pageNumber: task.pageCount,
-      },
+    this.#log.debug({
+      msg: "page stored",
+      taskId: task.id,
+      wayfinderUrl: pageData.wayfinderUrl,
+      pageCount: task.pageCount,
     })
 
     return Utils.empty()
@@ -474,16 +401,13 @@ export default class CrawlingService {
       if (resolvingGatewayUrl.failed) return Utils.error(resolvingGatewayUrl.error)
     } while (resolvingGatewayUrl.data === input.failedUrl)
 
-    console.warn({
-      source: "Crawler",
-      message: input.errorMessages.pop()?.split("\n"),
-      context: {
-        taskId: input.taskId,
-        retry: input.retryCount + 1,
-        wayfinderUrl: resolvingWayfinderUrl.data,
-        failedGatewayUrl: input.failedUrl,
-        newGatewayUrl: resolvingGatewayUrl.data,
-      },
+    this.#log.warn({
+      msg: input.errorMessages,
+      taskId: input.taskId,
+      retryCount: input.retryCount + 1,
+      wayfinderUrl: resolvingWayfinderUrl.data,
+      failedGatewayUrl: input.failedUrl,
+      newGatewayUrl: resolvingGatewayUrl.data,
     })
 
     return resolvingGatewayUrl

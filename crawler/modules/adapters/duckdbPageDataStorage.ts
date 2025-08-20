@@ -19,21 +19,14 @@ const nullOrMap = <Item>(
 const nullOrList = (iterable: string[]) => (iterable.length < 1 ? null : Duckdb.listValue(iterable))
 
 export default class DuckdbPageDataStorage implements PageDataStorage.PageDataStorageOutput {
+  #log = Utils.getLogger("DuckdbPageDataStorage")
+
   async open(storageId: string) {
     return Utils.tryCatch(async () => {
-      await fs.mkdir(DATABASE_PATH, { recursive: true })
-
       const dbPath = path.join(DATABASE_PATH, `${storageId}.duckdb`)
+      this.#log.debug({ msg: "opening database", storageId, databasePath: dbPath })
 
-      console.info({
-        source: "DuckdbPageDataStorage",
-        message: "opening storage",
-        context: {
-          storageId,
-          databasePath: dbPath,
-        },
-      })
-
+      await fs.mkdir(DATABASE_PATH, { recursive: true })
       const duckdbInstance = await Duckdb.DuckDBInstance.create(dbPath)
       const duckdb = await duckdbInstance.connect()
 
@@ -126,15 +119,7 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
           Utils.tryCatch(async () => {
             duckdb.closeSync()
             await fs.unlink(path.join(DATABASE_PATH, `${storageId}.duckdb`))
-
-            console.info({
-              source: "DuckdbPageDataStorage",
-              message: "storage closed and database deleted",
-              context: {
-                storageId,
-                databasePath: dbPath,
-              },
-            })
+            this.#log.debug({ msg: "closed and deleted database", storageId, databasePath: dbPath })
           }),
       }
     })

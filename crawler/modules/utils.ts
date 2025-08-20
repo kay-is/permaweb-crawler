@@ -38,3 +38,31 @@ export async function tryCatch<TData, TError extends { message: string } = Error
 
   return ok(result)
 }
+
+import pino from "pino"
+
+const logger = pino({
+  level: "debug",
+  formatters: {
+    log(obj: any) {
+      if (Array.isArray(obj.msg)) {
+        obj.msg = obj.msg[0]
+          .split("\n")
+          .map((line: string) => {
+            if (line.includes("node_modules")) return null
+            if (line.includes("node:")) return null
+
+            return line.trim().replace(/^at /, "")
+          })
+          .filter(Boolean)
+          .join("\n")
+      }
+
+      return obj
+    },
+  },
+})
+
+export function getLogger(moduleName: string) {
+  return logger.child({ module: moduleName })
+}

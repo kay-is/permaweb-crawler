@@ -4,13 +4,11 @@ import * as Utils from "../utils.js"
 import * as WebServer from "../ports/webServer.js"
 
 export default class NodeHttpWebServer implements WebServer.WebServerOutput {
+  #log = Utils.getLogger("NodeHttpWebServer")
+
   async start(config: WebServer.WebServerConfig) {
     return Utils.tryCatch(async () => {
-      console.info({
-        source: "NodeHttpWebServer",
-        message: "starting",
-        context: config,
-      })
+      this.#log.debug({ msg: "starting web server", config })
 
       const server = http.createServer(config.requestHandler)
 
@@ -18,21 +16,11 @@ export default class NodeHttpWebServer implements WebServer.WebServerOutput {
         server.on("listening", () => {
           Array("SIGINT", "SIGTERM").forEach((signal) => {
             process.on(signal, async () => {
-              console.info({
-                source: "NodeHttpWebServer",
-                message: "Shutting down",
-                context: {
-                  signal,
-                },
-              })
+              this.#log.debug({ msg: "received shutdown signal", signal })
 
               await new Promise((r) => server.close(r))
 
-              console.info({
-                source: "NodeHttpWebServer",
-                message: "Shutdown complete",
-                context: { signal },
-              })
+              this.#log.info({ msg: "shutdown complete", signal })
               process.exit(0)
             })
           })

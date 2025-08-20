@@ -9,26 +9,22 @@ export type StaticWayfinderArnsResolverAdapterConfig = {
 }
 
 export default class StaticWayfinderArnsResolver implements ArnsResolver.ArnsResolverInput {
+  #log = Utils.getLogger("StaticWayfinderArnsResolver")
+
   #wayfinder: WayfinderCore.Wayfinder
 
   constructor(config: StaticWayfinderArnsResolverAdapterConfig) {
-    console.info({
-      source: "StaticWayfinderArnsResolver",
-      message: "initializing",
-      context: {
-        providers: ["StaticGatewaysProvider"],
-        gateways: config.gatewayUrls,
-      },
+    this.#log.debug({
+      msg: "initializing resolver",
+      providers: ["StaticGatewaysProvider"],
+      gateways: config.gatewayUrls,
     })
+
     this.#wayfinder = new WayfinderCore.Wayfinder({
+      logger: Utils.getLogger("WayfinderCore.Wayfinder"),
       gatewaysProvider: new WayfinderCore.StaticGatewaysProvider({
         gateways: config.gatewayUrls,
       }),
-      logger: {
-        ...console,
-        debug: () => null,
-        info: () => null,
-      },
     })
   }
 

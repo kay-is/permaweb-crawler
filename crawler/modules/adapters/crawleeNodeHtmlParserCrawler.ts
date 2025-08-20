@@ -9,6 +9,8 @@ import * as CustomRequestQueue from "./crawleeCustomRequestQueue.js"
 Crawlee.log.setLevel(Crawlee.LogLevel.SOFT_FAIL)
 
 export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInput {
+  #log = Utils.getLogger("CrawleeNodeHtmlParserCrawler")
+
   #taskId?: string
   #extractHashUrls?: boolean
 
@@ -17,11 +19,7 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
 
   async start(config: Crawler.CrawlerConfig) {
     return Utils.tryCatch(async () => {
-      console.info({
-        source: "CrawleeNodeHtmlParserCrawler",
-        message: "starting",
-        context: config,
-      })
+      this.#log.debug({ msg: "starting crawler", config })
 
       this.#taskId = config.taskId
       this.#extractHashUrls = config.extractHashUrls
@@ -43,13 +41,15 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
         errorHandler: this.#basicErrorHandler.bind(this),
       })
 
-      await crawler.run(
+      const result = await crawler.run(
         // the crawler only understands HTTP/gatway URLs, but accepts any string as uniqueKey
         config.initialRequests.map(({ gatewayUrl, wayfinderUrl }) => ({
           url: gatewayUrl,
           uniqueKey: wayfinderUrl,
         })),
       )
+
+      this.#log.info({ msg: "crawler finished", ...result })
     })
   }
 

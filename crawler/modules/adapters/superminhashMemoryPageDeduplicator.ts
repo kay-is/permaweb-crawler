@@ -9,17 +9,12 @@ const SEED = 1984
 export default class SuperminhashMemoryPageDeduplicator
   implements PageDeduplicator.PageDeduplicatorUtil
 {
+  #log = Utils.getLogger("SuperminhashMemoryPageDeduplicator")
+
   #stores: Record<string, superminhash.SuperMinHash[]> = {}
 
   async open(storageId: string, similarityThreshold: number) {
-    console.info({
-      source: "SuperminhashMemoryPageDeduplicator",
-      message: "initializing",
-      context: {
-        storageId,
-        similarityThreshold,
-      },
-    })
+    this.#log.debug({ msg: "opening storage", storageId, similarityThreshold })
 
     const hashStore = this.#stores[storageId] || []
     this.#stores[storageId] = hashStore

@@ -8,6 +8,8 @@ import type * as ApiServer from "../ports/apiServer.js"
 export type AppRouter = TrpcApiServer["appRouter"]
 
 export default class TrpcApiServer implements ApiServer.ApiServerInput {
+  #log = Utils.getLogger("TrpcApiServer")
+
   #createTaskHandler?: ApiServer.CreateTaskHandler
   #listTasksHandler?: ApiServer.ListTasksHandler
 
@@ -32,10 +34,9 @@ export default class TrpcApiServer implements ApiServer.ApiServerInput {
   }
 
   async start(config: ApiServer.ApiServerConfig) {
-    console.info({
-      source: "TrpcApiServer",
-      message: "starting",
-      context: config,
+    this.#log.debug({
+      msg: "starting server",
+      config: { ...config, handlers: Object.keys(config.handlers) },
     })
 
     this.#createTaskHandler = config.handlers.createTask
@@ -45,14 +46,7 @@ export default class TrpcApiServer implements ApiServer.ApiServerInput {
       TrpcServerAdapter.createHTTPHandler({
         router: this.#appRouter,
         onError: (opts) => {
-          console.error({
-            source: "TrpcApiServer",
-            message: opts.error.message,
-            context: {
-              path: opts.path,
-              input: opts.input,
-            },
-          })
+          this.#log.error({ msg: opts.error.message, path: opts.path, input: opts.input })
         },
       }),
     )

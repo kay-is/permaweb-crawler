@@ -3,6 +3,7 @@ import * as Crawlee from "crawlee"
 
 import * as Entities from "../entities.js"
 import type * as Crawler from "../ports/crawler.js"
+import * as Utils from "../utils.js"
 
 export type CustomRequestQueueConfig = {
   taskId: string
@@ -11,6 +12,8 @@ export type CustomRequestQueueConfig = {
 }
 
 export const open = async (config: CustomRequestQueueConfig) => {
+  const log = Utils.getLogger("CrawleeCustomRequestQueue")
+  log.debug({ msg: "opening queue", config })
   const customRequestQueue = await Crawlee.RequestQueue.open(config.taskId)
 
   const addRequests = customRequestQueue.addRequests.bind(customRequestQueue)
@@ -31,28 +34,17 @@ export const open = async (config: CustomRequestQueueConfig) => {
         | Entities.GatewayUrl
         | undefined
       if (!validUrl) {
-        console.warn({
-          source: "CrawleeCustomRequestQueue",
-          message: "Invalid URL",
-          context: {
-            taskId: config.taskId,
-            gatewayUrl: oldGatewayUrl,
-          },
-        })
+        log.warn({ msg: "invalid gateway URL", taskId: config.taskId, gatewayUrl: oldGatewayUrl })
         continue
       }
 
       const resolvedUrls = await config.resolveUrlHandler(validUrl)
 
       if (resolvedUrls.failed) {
-        console.warn({
-          source: "CrawleeCustomRequestQueue",
-          message: "Failed to resolve URL",
-          context: {
-            taskId: config.taskId,
-            gatewayUrl: validUrl,
-            error: resolvedUrls.error.message,
-          },
+        log.warn({
+          msg: resolvedUrls.error.message,
+          taskId: config.taskId,
+          gatewayUrl: validUrl,
         })
         continue
       }
