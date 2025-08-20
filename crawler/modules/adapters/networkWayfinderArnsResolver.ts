@@ -5,12 +5,13 @@ import * as Utils from "../utils.js"
 import type * as Entities from "../entities.js"
 import type * as ArnsResolver from "../ports/arnsResolver.js"
 
-export default class NetworkWayfinderArnsResolver implements ArnsResolver.ArnsResolverInput {
+export default class NetworkWayfinderArnsResolver extends Utils.WrappedAdapter implements ArnsResolver.ArnsResolverInput {
   #log = Utils.getLogger("NetworkWayfinderArnsResolver")
 
   #wayfinder: WayfinderCore.Wayfinder
 
   constructor() {
+    super()
     this.#log.debug({
       msg: "initializing resolver",
       network: "mainnet",
@@ -29,7 +30,7 @@ export default class NetworkWayfinderArnsResolver implements ArnsResolver.ArnsRe
   }
 
   async resolve(urlOrArnsName: Entities.WayfinderUrl | Entities.ArnsName) {
-    return Utils.tryCatch(async () => {
+    return this.wrap(async () => {
       const config = urlOrArnsName.startsWith("ar://")
         ? { wayfinderUrl: urlOrArnsName as Entities.WayfinderUrl }
         : { arnsName: urlOrArnsName }
@@ -40,7 +41,7 @@ export default class NetworkWayfinderArnsResolver implements ArnsResolver.ArnsRe
   }
 
   async dissolve(url: Entities.GatewayUrl | URL) {
-    return Utils.tryCatch(async () => {
+    return this.wrap(async () => {
       const wayfinderUrl = new URL(url)
       wayfinderUrl.hostname = wayfinderUrl.hostname.split(".").shift() as string
       return wayfinderUrl

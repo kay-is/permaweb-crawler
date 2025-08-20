@@ -3,9 +3,9 @@ import * as NodeHtmlParser from "node-html-parser"
 import * as Utils from "../utils.js"
 import type * as PageDataExtractor from "../ports/pageDataExtractor.js"
 
-export default class NodeHtmlParserExtractor implements PageDataExtractor.PageDataExtractorUtil {
+export default class NodeHtmlParserExtractor extends Utils.WrappedAdapter implements PageDataExtractor.PageDataExtractorUtil {
   async extract(html: string) {
-    return Utils.tryCatch(() => {
+    return this.wrap(() => {
       const document = NodeHtmlParser.parse(html)
 
       // Normalize HTML

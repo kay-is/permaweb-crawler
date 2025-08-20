@@ -3,16 +3,16 @@ import http from "node:http"
 import * as Utils from "../utils.js"
 import * as WebServer from "../ports/webServer.js"
 
-export default class NodeHttpWebServer implements WebServer.WebServerOutput {
+export default class NodeHttpWebServer extends Utils.WrappedAdapter implements WebServer.WebServerOutput {
   #log = Utils.getLogger("NodeHttpWebServer")
 
   async start(config: WebServer.WebServerConfig) {
-    return Utils.tryCatch(async () => {
+    return this.wrap(() => {
       this.#log.debug({ msg: "starting web server", config })
 
       const server = http.createServer(config.requestHandler)
 
-      return new Promise<Utils.EmptyResult>((resolve, reject) => {
+      return new Promise<void>((resolve, reject) => {
         server.on("listening", () => {
           Array("SIGINT", "SIGTERM").forEach((signal) => {
             process.on(signal, async () => {
@@ -25,13 +25,13 @@ export default class NodeHttpWebServer implements WebServer.WebServerOutput {
             })
           })
 
-          resolve(Utils.empty())
+          resolve()
         })
 
         try {
           server.listen(config.port)
         } catch (error: any) {
-          reject(Utils.error(error))
+          reject(error)
         }
       })
     })

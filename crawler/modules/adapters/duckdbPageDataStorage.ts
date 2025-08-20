@@ -18,11 +18,11 @@ const nullOrMap = <Item>(
 
 const nullOrList = (iterable: string[]) => (iterable.length < 1 ? null : Duckdb.listValue(iterable))
 
-export default class DuckdbPageDataStorage implements PageDataStorage.PageDataStorageOutput {
+export default class DuckdbPageDataStorage extends Utils.WrappedAdapter implements PageDataStorage.PageDataStorageOutput {
   #log = Utils.getLogger("DuckdbPageDataStorage")
 
   async open(storageId: string) {
-    return Utils.tryCatch(async () => {
+    return this.wrap(async () => {
       const dbPath = path.join(DATABASE_PATH, `${storageId}.duckdb`)
       this.#log.debug({ msg: "opening database", storageId, databasePath: dbPath })
 
@@ -62,9 +62,10 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
         );
       `)
 
-      return {
-        save: (data: Entities.PageData) =>
-          Utils.tryCatch(async () => {
+      // Create wrapped methods for the returned store
+      const wrappedStore = {
+        save: async (data: Entities.PageData) => {
+          return Utils.tryCatch(async () => {
             const htmlHash = crypto.createHash("sha256").update(data.normalizedHtml).digest("hex")
 
             await duckdb.run(
@@ -102,9 +103,12 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
             `,
               [htmlHash, data.normalizedHtml],
             )
-          }),
-        export: () =>
-          Utils.tryCatch(async () => {
+
+            return Utils.empty()
+          })
+        },
+        export: async () => {
+          return Utils.tryCatch(async () => {
             await fs.mkdir(EXPORTS_PATH, { recursive: true })
 
             await duckdb.run(`
@@ -114,14 +118,21 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
               COPY ${htmlTableName} 
               TO '${path.join(EXPORTS_PATH, `${storageId}-html.parquet`)}' (FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 10);
             `)
-          }),
-        close: () =>
-          Utils.tryCatch(async () => {
+
+            return Utils.empty()
+          })
+        },
+        close: async () => {
+          return Utils.tryCatch(async () => {
             duckdb.closeSync()
             await fs.unlink(path.join(DATABASE_PATH, `${storageId}.duckdb`))
             this.#log.debug({ msg: "closed and deleted database", storageId, databasePath: dbPath })
-          }),
+            return Utils.empty()
+          })
+        },
       }
+
+      return wrappedStore
     })
   }
 }

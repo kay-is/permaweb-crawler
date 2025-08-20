@@ -8,7 +8,7 @@ import * as CustomRequestQueue from "./crawleeCustomRequestQueue.js"
 
 Crawlee.log.setLevel(Crawlee.LogLevel.SOFT_FAIL)
 
-export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInput {
+export default class CrawleeNodeHtmlParserCrawler extends Utils.WrappedAdapter implements Crawler.CrawlerInput {
   #log = Utils.getLogger("CrawleeNodeHtmlParserCrawler")
 
   #taskId?: string
@@ -18,7 +18,7 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
   #scrapingErrorHandler?: Crawler.CrawlerScrapingErrorHandler
 
   async start(config: Crawler.CrawlerConfig) {
-    return Utils.tryCatch(async () => {
+    return this.wrap(async () => {
       this.#log.debug({ msg: "starting crawler", config })
 
       this.#taskId = config.taskId

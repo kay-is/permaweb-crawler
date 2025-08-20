@@ -39,6 +39,76 @@ export async function tryCatch<TData, TError extends { message: string } = Error
   return ok(result)
 }
 
+/**
+ * Automatically wraps all methods of an adapter class with tryCatch functionality.
+ * This eliminates the need to manually call Utils.tryCatch in each adapter method.
+ * 
+ * @param adapter The adapter instance to wrap
+ * @returns A new adapter instance with all methods automatically wrapped
+ */
+export function wrapAdapter<T extends object>(adapter: T): T {
+  // Create a new object that will hold the wrapped methods
+  const wrappedAdapter = Object.create(Object.getPrototypeOf(adapter))
+  
+  // Copy all properties from the original adapter
+  Object.getOwnPropertyNames(adapter).forEach(key => {
+    wrappedAdapter[key] = (adapter as any)[key]
+  })
+
+  // Get all method names from the prototype chain
+  const methodNames = new Set<string>()
+  let current = adapter
+  while (current && current !== Object.prototype) {
+    Object.getOwnPropertyNames(current).forEach(name => {
+      if (name !== 'constructor' && typeof (current as any)[name] === 'function') {
+        methodNames.add(name)
+      }
+    })
+    current = Object.getPrototypeOf(current)
+  }
+
+  // Wrap each method
+  methodNames.forEach(methodName => {
+    const originalMethod = (adapter as any)[methodName]
+    if (typeof originalMethod === 'function') {
+      wrappedAdapter[methodName] = async function(...args: any[]) {
+        try {
+          const result = await originalMethod.apply(adapter, args)
+          
+          // If the result is already a Result object, return it as-is
+          if (typeof result === "object" && result !== null && "ok" in result) {
+            return result
+          }
+          
+          // Otherwise, wrap the result in an ok() Result
+          return ok(result)
+        } catch (e: any) {
+          return error(e)
+        }
+      }
+    }
+  })
+
+  return wrappedAdapter as T
+}
+
+/**
+ * A simpler approach: Create a base class that adapters can extend to get automatic wrapping
+ */
+export abstract class WrappedAdapter {
+  /**
+   * Wraps a method implementation with automatic error handling
+   */
+  protected async wrap<T>(fn: () => Promise<T> | T): Promise<Result<T>> {
+    try {
+      const result = await fn()
+      return ok(result)
+    } catch (e: any) {
+      return error(e)
+    }
+  }
+}
+
 import pino from "pino"
 
 const logger = pino({

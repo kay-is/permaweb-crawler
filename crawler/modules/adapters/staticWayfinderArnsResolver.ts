@@ -8,12 +8,13 @@ export type StaticWayfinderArnsResolverAdapterConfig = {
   gatewayUrls: `https://${string}`[]
 }
 
-export default class StaticWayfinderArnsResolver implements ArnsResolver.ArnsResolverInput {
+export default class StaticWayfinderArnsResolver extends Utils.WrappedAdapter implements ArnsResolver.ArnsResolverInput {
   #log = Utils.getLogger("StaticWayfinderArnsResolver")
 
   #wayfinder: WayfinderCore.Wayfinder
 
   constructor(config: StaticWayfinderArnsResolverAdapterConfig) {
+    super()
     this.#log.debug({
       msg: "initializing resolver",
       providers: ["StaticGatewaysProvider"],
@@ -29,7 +30,7 @@ export default class StaticWayfinderArnsResolver implements ArnsResolver.ArnsRes
   }
 
   async resolve(urlOrArnsName: Entities.WayfinderUrl | Entities.ArnsName) {
-    return Utils.tryCatch(async () => {
+    return this.wrap(async () => {
       const config = urlOrArnsName.startsWith("ar://")
         ? { wayfinderUrl: urlOrArnsName as Entities.WayfinderUrl }
         : { arnsName: urlOrArnsName }
@@ -40,7 +41,7 @@ export default class StaticWayfinderArnsResolver implements ArnsResolver.ArnsRes
   }
 
   async dissolve(url: Entities.GatewayUrl | URL) {
-    return Utils.tryCatch(async () => {
+    return this.wrap(async () => {
       const wayfinderUrl = new URL(url)
       wayfinderUrl.hostname = wayfinderUrl.hostname.split(".").shift() as string
       return wayfinderUrl
