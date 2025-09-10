@@ -280,7 +280,7 @@ export default class CrawlingService {
     return Object.values(this.#tasks)
   }
 
-  // called by CrawlerPort for every crawled page
+  // called by CrawlerPort for every crawled page if javascript execution is enabled
   // excutes befor the javascript of the page
   // used to set up a stable environment for the crawler
   // "this" is not available in this function because it's called in the browser context
@@ -330,36 +330,24 @@ export default class CrawlingService {
     )?.value
     if (!resolvedTxId) return Utils.error(new Error(`x-arns-resolved-id header missing`))
 
-    pageData.foundUrls.sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
-    )
-
     const store = this.#pageDataStores[pageData.taskId]
     if (!store) return Utils.error(new Error("Store not found for " + pageData.taskId))
 
-    const relativeUrls = pageData.foundUrls
-      .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
-      .map((url) => url.trim().toLowerCase())
-
-    const absoluteUrls = pageData.foundUrls
-      .filter((url) => !url.startsWith("/") && !url.startsWith("./") && !url.startsWith("#/"))
-      .map((url) => url.trim().toLowerCase())
-
-    pageData.headers.sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+    const relativeUrls = pageData.foundUrls.filter(
+      (url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"),
     )
-    const headers = pageData.headers.map((header) => ({
-      name: header.name.trim().toLowerCase(),
-      value: header.value.trim().toLowerCase(),
-    }))
+
+    const absoluteUrls = pageData.foundUrls.filter(
+      (url) => !url.startsWith("/") && !url.startsWith("./") && !url.startsWith("#/"),
+    )
 
     const storingPageData = await store.save({
       ...extractingHtmlData.data,
       txId: resolvedTxId,
-      arnsName: pageData.arnsName.trim().toLowerCase(),
-      wayfinderUrl: pageData.wayfinderUrl.trim().toLowerCase(),
-      gatewayUrl: pageData.gatewayUrl.trim().toLowerCase(),
-      headers,
+      arnsName: pageData.arnsName,
+      wayfinderUrl: pageData.wayfinderUrl,
+      gatewayUrl: pageData.gatewayUrl,
+      headers: pageData.headers,
       absoluteUrls,
       relativeUrls,
     })
@@ -400,13 +388,11 @@ export default class CrawlingService {
 
     if (resolvingWayfinderUrl.failed) return Utils.error(resolvingWayfinderUrl.error)
 
-    let resolvingGatewayUrl: Utils.Result<Entities.GatewayUrl>
-    do {
-      // choose new gateway for failed URL
-      resolvingGatewayUrl = await this.#inputs.arnsResolver.resolve(resolvingWayfinderUrl.data)
+    // failed requests will be retried with the ar.io gateway.
+    const newUrl = new URL(resolvingWayfinderUrl.data.replace("ar://", "https://"))
+    newUrl.hostname = newUrl.hostname + ".ar.io"
 
-      if (resolvingGatewayUrl.failed) return Utils.error(resolvingGatewayUrl.error)
-    } while (resolvingGatewayUrl.data === input.failedUrl)
+    const newGatewayUrl = decodeURIComponent(newUrl.toString())
 
     this.#log.warn({
       msg: input.errorMessages,
@@ -414,9 +400,9 @@ export default class CrawlingService {
       retryCount: input.retryCount + 1,
       wayfinderUrl: resolvingWayfinderUrl.data,
       failedGatewayUrl: input.failedUrl,
-      newGatewayUrl: resolvingGatewayUrl.data,
+      newGatewayUrl,
     })
 
-    return resolvingGatewayUrl
+    return Utils.ok(newGatewayUrl)
   }
 }

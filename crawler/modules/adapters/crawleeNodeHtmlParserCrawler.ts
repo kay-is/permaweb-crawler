@@ -31,9 +31,10 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
 
       const crawler = new Crawlee.BasicCrawler({
         requestHandlerTimeoutSecs: 5,
-        maxConcurrency: 10,
-        maxRequestRetries: 5,
-        respectRobotsTxtFile: true,
+        maxConcurrency: 20,
+        minConcurrency: 5,
+        maxRequestRetries: 2,
+        respectRobotsTxtFile: false,
         maxCrawlDepth: config.maxDepth,
         maxRequestsPerCrawl: config.maxPages,
         requestQueue: customRequestQueue,
@@ -59,33 +60,47 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
 
   // called by Crawlee for each request
   async #basicRequestHandler(context: Crawlee.BasicCrawlingContext) {
+    const arnsName = (context.request.uniqueKey.split("/")[2] ?? "")
+      .trim()
+      .toLowerCase() as Entities.ArnsName
+
     const response = await context.sendRequest()
+
+    // requests with error status will be retried on different gateway before finally failing
+    if (response.statusCode >= 400) throw new Error(`Received status ${response.statusCode}`)
+
     const dom = NodeHtmlParser.parse(response.body)
+
+    const headers = response.headers ?? {}
+    for (const header in headers) if (headers[header] === undefined) delete headers[header]
+
+    const headersArray = Object.entries(headers)
+      .map(([name, value]) => ({
+        name: name.trim().toLowerCase(),
+        value: ("" + value).trim().toLowerCase(),
+      }))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+      )
 
     let foundUrls = dom
       .querySelectorAll("a[href]")
       .map((anchor) => {
         const href = anchor.getAttribute("href")
-        return href ? decodeURIComponent(href) : ""
+        const url = href ? decodeURIComponent(href) : ""
+        return url.trim().toLowerCase()
       })
-      .filter((url) => url !== "/" && !!url)
+      .filter((url, index, array) => array.indexOf(url) === index)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }))
 
     if (!this.#extractHashUrls)
       foundUrls = foundUrls.map((url) => url.split("#").shift() ?? "").filter((url) => !!url)
 
-    const headers = response.headers ?? {}
-    for (const header in headers) if (headers[header] === undefined) delete headers[header]
-
-    const headersArray = Object.entries(headers).map(([name, value]) => ({
-      name,
-      value: "" + value,
-    }))
-
     const handlingPageData = await this.#pageDataHandler?.({
       taskId: this.#taskId ?? "N/A",
-      arnsName: context.request.uniqueKey.split("/")[2] ?? "",
-      wayfinderUrl: context.request.uniqueKey as Entities.WayfinderUrl,
-      gatewayUrl: context.request.url as Entities.GatewayUrl,
+      arnsName,
+      wayfinderUrl: context.request.uniqueKey.trim().toLowerCase() as Entities.WayfinderUrl,
+      gatewayUrl: context.request.url.trim().toLowerCase() as Entities.GatewayUrl,
       html: response.body,
       foundUrls,
       headers: headersArray,
@@ -94,6 +109,7 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
     if (handlingPageData?.failed) throw handlingPageData.error
 
     const relativeUrls = foundUrls
+      .filter((url) => url !== "/" && !!url) // remove empty and homepage links
       .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
       .map((url) => new URL(url, context.request.url).href)
 
