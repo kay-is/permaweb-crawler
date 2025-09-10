@@ -32,14 +32,14 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
 
     const crawling = await Utils.tryCatch(async () => {
       const crawler = new Crawlee.PlaywrightCrawler({
-        navigationTimeoutSecs: 10,
-        requestQueue: customRequestQueue,
-        maxConcurrency: 5,
-        maxRequestRetries: 5,
-        respectRobotsTxtFile: true,
+        maxConcurrency: 10,
+        minConcurrency: 2,
+        maxRequestRetries: 2,
+        respectRobotsTxtFile: false,
         maxCrawlDepth: config.maxDepth,
         maxRequestsPerCrawl: config.maxPages,
         launchContext: { launcher: Playwright.chromium },
+        requestQueue: customRequestQueue,
         requestHandler: this.#playwrightRequestHandler.bind(this),
         errorHandler: this.#playwrightErrorHandler.bind(this),
       })
@@ -60,13 +60,21 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
   }
 
   async #playwrightRequestHandler(context: Crawlee.PlaywrightCrawlingContext) {
-    if (!this.#taskId) throw new Error("taskId not set!")
-    if (!this.#pageDataHandler) throw new Error("pageDataHandler not set!")
-    if (!this.#pageInitHandler) throw new Error("pageInitHandler not set!")
+    const arnsName = (context.request.uniqueKey.split("/")[2] ?? "")
+      .trim()
+      .toLowerCase() as Entities.ArnsName
 
-    await context.page.addInitScript(this.#pageInitHandler)
+    if (!!this.#pageInitHandler) await context.page.addInitScript(this.#pageInitHandler)
 
-    if (this.#extractHashUrls) await context.page.waitForLoadState("networkidle", { timeout: 5000 })
+    const headers = (await context.response?.allHeaders()) ?? {}
+    const headersArray = Object.entries(headers)
+      .map(([name, value]) => ({
+        name: name.trim().toLowerCase(),
+        value: ("" + value).trim().toLowerCase(),
+      }))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+      )
 
     // the locator() call ensures page JS was executed before selecting elements
     // which is vital for the content() call below.
@@ -75,8 +83,13 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
       // performs URL extraction inside browser
       .evaluateAll((anchors) =>
         anchors
-          .map((anchor) => decodeURIComponent(anchor.getAttribute("href") ?? ""))
-          .filter((url) => url !== "/" && !!url),
+          .map((anchor) => {
+            const href = anchor.getAttribute("href")
+            const url = href ? decodeURIComponent(href) : ""
+            return url.trim().toLowerCase()
+          })
+          .filter((url, index, array) => array.indexOf(url) === index)
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })),
       )
 
     if (!this.#extractHashUrls)
@@ -84,22 +97,25 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
 
     // requires a locator() call for client-side rendered pages
     const html = await context.page.content()
-    const headers = (await context.response?.allHeaders()) ?? {}
-    const headersArray = Object.entries(headers).map(([name, value]) => ({ name, value }))
 
-    const handlingPageData = await this.#pageDataHandler({
-      taskId: this.#taskId,
-      arnsName: context.request.uniqueKey.split("/")[2] ?? "",
-      wayfinderUrl: context.request.uniqueKey as Entities.WayfinderUrl,
-      gatewayUrl: context.request.url as Entities.GatewayUrl,
+    const handlingPageData = await this.#pageDataHandler?.({
+      taskId: this.#taskId ?? "N/A",
+      arnsName,
+      wayfinderUrl: context.request.uniqueKey.trim().toLowerCase() as Entities.WayfinderUrl,
+      gatewayUrl: context.request.url.trim().toLowerCase() as Entities.GatewayUrl,
       html,
       foundUrls,
       headers: headersArray,
     })
 
-    if (handlingPageData.failed) throw handlingPageData.error
+    if (handlingPageData?.failed) throw handlingPageData.error
 
-    await context.enqueueLinks()
+    const relativeUrls = foundUrls
+      .filter((url) => url !== "/" && !!url) // remove empty and homepage links
+      .filter((url) => url.startsWith("/") || url.startsWith("./") || url.startsWith("#/"))
+      .map((url) => new URL(url, context.request.url).href)
+
+    await context.enqueueLinks({ urls: relativeUrls })
   }
 
   async #playwrightErrorHandler(context: Crawlee.BrowserCrawlingContext) {
