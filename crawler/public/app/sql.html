@@ -14,7 +14,6 @@
     margin: 0;
   }
   .pondpilot-output.show {
-    max-height:;
     max-height: 90vh;
   }
 </style>
@@ -23,7 +22,7 @@
   const element = document.querySelector("pre")
   const file = new URLSearchParams(window.location.search).get("file")
   if (file) {
-    element.textContent = `SELECT * FROM '${file}';`
+    element.textContent = `SELECT * FROM '${file}' ORDER BY url;`
     const widget = new PondPilot.Widget(element)
     await widget.run()
   }
