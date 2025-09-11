@@ -325,11 +325,6 @@ export default class CrawlingService {
       return Utils.empty()
     }
 
-    const resolvedTxId = pageData.headers.find(
-      (header) => header.name === "x-arns-resolved-id",
-    )?.value
-    if (!resolvedTxId) return Utils.error(new Error(`x-arns-resolved-id header missing`))
-
     const store = this.#pageDataStores[pageData.taskId]
     if (!store) return Utils.error(new Error("Store not found for " + pageData.taskId))
 
@@ -343,11 +338,10 @@ export default class CrawlingService {
 
     const storingPageData = await store.save({
       ...extractingHtmlData.data,
-      txId: resolvedTxId,
       arnsName: pageData.arnsName,
+      txId: pageData.resolvedId,
+      dataId: pageData.dataId,
       wayfinderUrl: pageData.wayfinderUrl,
-      gatewayUrl: pageData.gatewayUrl,
-      headers: pageData.headers,
       absoluteUrls,
       relativeUrls,
     })
@@ -390,7 +384,7 @@ export default class CrawlingService {
 
     // failed requests will be retried with the ar.io gateway.
     const newUrl = new URL(resolvingWayfinderUrl.data.replace("ar://", "https://"))
-    newUrl.hostname = newUrl.hostname + ".ar.io"
+    newUrl.hostname = newUrl.hostname + ".permagate.io"
 
     const newGatewayUrl = decodeURIComponent(newUrl.toString())
 

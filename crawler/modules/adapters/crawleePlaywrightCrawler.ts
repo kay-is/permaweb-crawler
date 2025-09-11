@@ -67,14 +67,10 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
     if (!!this.#pageInitHandler) await context.page.addInitScript(this.#pageInitHandler)
 
     const headers = (await context.response?.allHeaders()) ?? {}
-    const headersArray = Object.entries(headers)
-      .map(([name, value]) => ({
-        name: name.trim().toLowerCase(),
-        value: ("" + value).trim().toLowerCase(),
-      }))
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
-      )
+    const resolvedId = "" + headers["x-arns-resolved-id"]
+    const dataId = "" + headers["x-ar-io-data-id"]
+
+    if (!resolvedId || !dataId) throw new Error("missing ArNS headers")
 
     // the locator() call ensures page JS was executed before selecting elements
     // which is vital for the content() call below.
@@ -101,11 +97,12 @@ export default class CrawleePlaywrightCrawler implements Crawler.CrawlerInput {
     const handlingPageData = await this.#pageDataHandler?.({
       taskId: this.#taskId ?? "N/A",
       arnsName,
+      resolvedId,
+      dataId,
       wayfinderUrl: context.request.uniqueKey.trim().toLowerCase() as Entities.WayfinderUrl,
       gatewayUrl: context.request.url.trim().toLowerCase() as Entities.GatewayUrl,
       html,
       foundUrls,
-      headers: headersArray,
     })
 
     if (handlingPageData?.failed) throw handlingPageData.error

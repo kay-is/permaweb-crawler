@@ -33,7 +33,7 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
         requestHandlerTimeoutSecs: 5,
         maxConcurrency: 20,
         minConcurrency: 5,
-        maxRequestRetries: 2,
+        maxRequestRetries: 5,
         respectRobotsTxtFile: false,
         maxCrawlDepth: config.maxDepth,
         maxRequestsPerCrawl: config.maxPages,
@@ -71,16 +71,13 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
 
     const dom = NodeHtmlParser.parse(response.body)
 
-    const headers = response.headers ?? {}
-    for (const header in headers) if (headers[header] === undefined) delete headers[header]
-
-    const headersArray = Object.entries(headers)
-      .map(([name, value]) => ({
-        name: name.trim().toLowerCase(),
-        value: ("" + value).trim().toLowerCase(),
-      }))
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+    const resolvedId = response.headers["x-arns-resolved-id"]
+    const dataId = response.headers["x-ar-io-data-id"]
+    if (!resolvedId || !dataId)
+      throw new Error(
+        `Missing required header(s): ${
+          !resolvedId ? "x-arns-resolved-id " : ""
+        }${!dataId ? "x-ar-io-data-id" : ""}`.trim(),
       )
 
     let foundUrls = dom
@@ -96,14 +93,17 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
     if (!this.#extractHashUrls)
       foundUrls = foundUrls.map((url) => url.split("#").shift() ?? "").filter((url) => !!url)
 
+    const html = response.body
+
     const handlingPageData = await this.#pageDataHandler?.({
       taskId: this.#taskId ?? "N/A",
       arnsName,
+      resolvedId: "" + resolvedId,
+      dataId: "" + dataId,
       wayfinderUrl: context.request.uniqueKey.trim().toLowerCase() as Entities.WayfinderUrl,
       gatewayUrl: context.request.url.trim().toLowerCase() as Entities.GatewayUrl,
-      html: response.body,
+      html,
       foundUrls,
-      headers: headersArray,
     })
 
     if (handlingPageData?.failed) throw handlingPageData.error

@@ -71,15 +71,9 @@ export type HtmlData = v.InferInput<typeof htmlDataSchema>
 export const pageDataSchema = v.object({
   ...htmlDataSchema.entries,
   txId: arweaveTxIdSchema,
+  dataId: v.string(),
   arnsName: arnsNameSchema,
   wayfinderUrl: wayfinderUrlSchema,
-  gatewayUrl: gatewayUrlSchema,
-  headers: v.array(
-    v.object({
-      name: v.string(),
-      value: v.string(),
-    }),
-  ),
   relativeUrls: v.array(v.string()),
   absoluteUrls: v.array(v.string()),
 })

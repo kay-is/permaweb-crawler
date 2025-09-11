@@ -1,4 +1,3 @@
-import crypto from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
 import * as Duckdb from "@duckdb/node-api"
@@ -34,31 +33,26 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
 
     const initializingTables = await Utils.tryCatch(async () => {
       await duckdb.run(`
-        CREATE TABLE IF NOT EXISTS ${detailsTableName} (
-          htmlHash VARCHAR PRIMARY KEY,
-          
-          txId VARCHAR NOT NULL,
+        CREATE TABLE IF NOT EXISTS ${detailsTableName} (   
+          url VARCHAR NOT NULL,
+
           arnsName VARCHAR NOT NULL,
-          wayfinderUrl VARCHAR NOT NULL,
-          gatewayUrl VARCHAR NOT NULL,
+          txId VARCHAR NOT NULL,
+          dataId VARCHAR NOT NULL,
+
           charset VARCHAR NOT NULL,
           language VARCHAR,
           title VARCHAR NOT NULL,
           description VARCHAR,
           
-          headers MAP(VARCHAR, VARCHAR),
           absoluteUrls VARCHAR[],
           relativeUrls VARCHAR[],
-          openGraph MAP(VARCHAR, VARCHAR),
-          
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          openGraph MAP(VARCHAR, VARCHAR)
         );
 
         CREATE TABLE IF NOT EXISTS ${htmlTableName} (
-          htmlHash VARCHAR PRIMARY KEY,
-          normalizedHtml VARCHAR NOT NULL,
-          
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          url VARCHAR PRIMARY KEY,
+          normalizedHtml VARCHAR NOT NULL
         );
       `)
     })
@@ -68,42 +62,41 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
     return Utils.ok({
       save: (data: Entities.PageData) =>
         Utils.tryCatch(async () => {
-          const htmlHash = crypto.createHash("sha256").update(data.normalizedHtml).digest("hex")
-
           await duckdb.run(
             `
             INSERT INTO ${detailsTableName}
-            (arnsName, wayfinderUrl, gatewayUrl, txId, charset, language, title, description, 
-            headers, absoluteUrls, relativeUrls, openGraph, htmlHash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (url, arnsName, txId, dataId, charset, language, title, description, 
+             absoluteUrls, relativeUrls, openGraph)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
-              data.arnsName,
               data.wayfinderUrl,
-              data.gatewayUrl,
+
+              data.arnsName,
               data.txId,
+              data.dataId,
+
               data.charset,
               data.language,
               data.title,
               data.description,
-              nullOrMap(data.headers, ({ name, value }) => ({ key: name, value })),
+
               nullOrList(data.absoluteUrls),
               nullOrList(data.relativeUrls),
               nullOrMap(data.openGraph, ({ property, content }) => ({
                 key: property,
                 value: content,
               })),
-              htmlHash,
             ],
           )
 
           await duckdb.run(
             `
             INSERT INTO ${htmlTableName}
-            (htmlHash, normalizedHtml)
+            (url, normalizedHtml)
             VALUES (?, ?)
             `,
-            [htmlHash, data.normalizedHtml],
+            [data.wayfinderUrl, data.normalizedHtml],
           )
         }),
       export: () =>
@@ -112,10 +105,12 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
 
           await duckdb.run(`
               COPY ${detailsTableName}
-              TO '${path.join(EXPORTS_PATH, `${storageId}-details.parquet`)}' (FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 10);
+              TO '${path.join(EXPORTS_PATH, `${storageId}-details.parquet`)}' 
+              (FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 10, ROW_GROUP_SIZE 100000);
               
               COPY ${htmlTableName} 
-              TO '${path.join(EXPORTS_PATH, `${storageId}-html.parquet`)}' (FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 10);
+              TO '${path.join(EXPORTS_PATH, `${storageId}-html.parquet`)}' 
+              (FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 10, ROW_GROUP_SIZE 100000);
             `)
         }),
       close: () =>

@@ -9,9 +9,10 @@ export type CrawlerRequest = {
 export type CrawlerPageData = {
   taskId: string
   arnsName: string
+  resolvedId: string
+  dataId: string
   wayfinderUrl: Entities.WayfinderUrl
   gatewayUrl: Entities.GatewayUrl
-  headers: { name: string; value: string }[]
   html: string
   foundUrls: string[]
 }
