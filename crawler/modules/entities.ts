@@ -32,6 +32,7 @@ export const crawlTaskSchema = v.object({
   id: v.string(),
   pageCount: v.number(),
   duplicateCount: v.number(),
+  uploadId: v.optional(v.string()),
   error: v.optional(v.string()),
   createdAt: v.number(),
   startedAt: v.optional(v.number()),

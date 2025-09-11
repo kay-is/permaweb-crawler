@@ -7,6 +7,7 @@ import SuperminhashMemoryPageDeduplicator from "./adapters/superminhashMemoryPag
 import NodeHttpWebServer from "./adapters/nodeHttpWebServer.js"
 import CrawlingService from "./service.js"
 import NetworkWayfinderArnsResolver from "./adapters/networkWayfinderArnsResolver.js"
+import TurboSdkPageDataUploader from "./adapters/turboSdkPageDataUploader.js"
 
 await CrawlingService.start({
   adapters: {
@@ -24,6 +25,7 @@ await CrawlingService.start({
     },
     outputs: {
       pageDataStorage: new DuckdbPageDataStorage(),
+      pageDataUploader: new TurboSdkPageDataUploader(),
       webServer: new NodeHttpWebServer(),
     },
   },

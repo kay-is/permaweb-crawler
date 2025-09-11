@@ -11,6 +11,7 @@ import type * as PageDataExtractor from "./ports/pageDataExtractor.js"
 import type * as ArnsResolver from "./ports/arnsResolver.js"
 import type * as PageDataStorage from "./ports/pageDataStorage.js"
 import type * as WebServer from "./ports/webServer.js"
+import type * as PageDataUploader from "./ports/pageDataUploader.js"
 import type * as PageDeduplicator from "./ports/pageDeduplicator.js"
 
 export interface CrawlingServiceConfig {
@@ -26,6 +27,7 @@ export interface CrawlingServiceConfig {
     }
     outputs: {
       pageDataStorage: PageDataStorage.PageDataStorageOutput
+      pageDataUploader: PageDataUploader.PageDataUploaderOutput
       webServer: WebServer.WebServerOutput
     }
   }
@@ -257,6 +259,15 @@ export default class CrawlingService {
 
     this.#log.debug({ msg: "export completed", taskId: task.id })
 
+    const uploadingData = await this.#outputs.pageDataUploader.upload(task.id)
+
+    if (uploadingData.failed) {
+      task.error = uploadingData.error.message
+      return this.#log.error({ msg: uploadingData.error.message, taskId: task.id })
+    }
+
+    task.uploadId = uploadingData.data
+
     task.finishedAt = Date.now()
 
     this.#log.info({
@@ -264,6 +275,7 @@ export default class CrawlingService {
       taskId: task.id,
       pageCount: task.pageCount,
       duplicateCount: task.duplicateCount,
+      uploadId: task.uploadId,
     })
 
     const nextTask = Object.values(this.#tasks).find((t) => t.id !== task.id && !t.finishedAt)
