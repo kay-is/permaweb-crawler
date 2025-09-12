@@ -1,0 +1,13 @@
+diff --git a/node_modules/@hono/node-server/dist/index.mjs b/node_modules/@hono/node-server/dist/index.mjs
+index 4e2fc67..71ed74f 100644
+--- a/node_modules/@hono/node-server/dist/index.mjs
++++ b/node_modules/@hono/node-server/dist/index.mjs
+@@ -392,7 +392,7 @@ var responseViaCache = async (res, outgoing) => {
+   outgoing[outgoingEnded]?.();
+ };
+ var responseViaResponseObject = async (res, outgoing, options = {}) => {
+-  if (res instanceof Promise) {
++  if (typeof res.then === 'function') {
+     if (options.errorHandler) {
+       try {
+         res = await res;

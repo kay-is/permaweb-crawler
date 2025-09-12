@@ -1,11 +1,7 @@
 import crypto from "node:crypto"
-import path from "node:path"
-import fs from "node:fs"
-import http from "node:http"
 
 import * as Utils from "./utils.js"
 import type * as Entities from "./entities.js"
-import type * as ApiServer from "./ports/apiServer.js"
 import type * as Crawler from "./ports/crawler.js"
 import type * as PageDataExtractor from "./ports/pageDataExtractor.js"
 import type * as ArnsResolver from "./ports/arnsResolver.js"
@@ -17,7 +13,7 @@ import type * as PageDeduplicator from "./ports/pageDeduplicator.js"
 export interface CrawlingServiceConfig {
   adapters: {
     inputs: {
-      apiServer: ApiServer.ApiServerInput
+      webServer: WebServer.WebServerInput
       crawlers: Record<Entities.CrawlerTypes, Crawler.CrawlerInput>
       arnsResolver: ArnsResolver.ArnsResolverInput
     }
@@ -28,7 +24,6 @@ export interface CrawlingServiceConfig {
     outputs: {
       pageDataStorage: PageDataStorage.PageDataStorageOutput
       pageDataUploader: PageDataUploader.PageDataUploaderOutput
-      webServer: WebServer.WebServerOutput
     }
   }
 }
@@ -46,8 +41,6 @@ export default class CrawlingService {
   #pageDataStores: Record<string, PageDataStorage.PageDataStore> = {}
   #pageDeduplicateStores: Record<string, PageDeduplicator.PageDuplicateStore> = {}
 
-  #apiServerHandler?: ApiServer.ApiServerHandler
-
   static async start(config: CrawlingServiceConfig) {
     return new CrawlingService(config).start()
   }
@@ -59,90 +52,22 @@ export default class CrawlingService {
   }
 
   async start() {
-    const apiServerStart = await this.#inputs.apiServer.start({
+    const webServerStart = await this.#inputs.webServer.start({
+      port: 3000,
       handlers: {
         createTask: this.#createTaskHandler.bind(this),
         listTasks: this.#listTasksHandler.bind(this),
       },
     })
 
-    if (apiServerStart.failed) return this.#log.error(apiServerStart.error.message)
-
-    this.#apiServerHandler = apiServerStart.data
-
-    const webServerStart = await this.#outputs.webServer.start({
-      port: 3000,
-      requestHandler: this.#webServerHandler.bind(this),
-    })
-
     if (webServerStart.failed) return this.#log.error(webServerStart.error.message)
 
     this.#log.info({
       msg: "service started",
-      apiServerUrl: "http://localhost:3000/",
-      webAppUrl: "http://localhost:3000/app/",
+      apiUrl: "http://localhost:3000/",
+      webApptUrl: "http://localhost:3000/app/",
       exportDataUrl: "http://localhost:3000/exports/",
     })
-  }
-
-  // called by WebServerPort
-  async #webServerHandler(
-    request: http.IncomingMessage,
-    response: http.ServerResponse<http.IncomingMessage>,
-  ) {
-    let url = request.url || "/"
-
-    if (url.startsWith("/app/")) {
-      if (url.endsWith("/")) {
-        response.setHeader("Location", url + "index.html")
-        response.statusCode = 301
-        return response.end()
-      }
-
-      response.setHeader("Content-Type", "text/html")
-      url = url.split("?")[0] as string
-      const filePath = path.join(path.resolve("public"), url)
-      try {
-        return fs.createReadStream(filePath).pipe(response)
-      } catch (error: any) {
-        this.#log.error(error.message)
-        response.statusCode = 404
-        return response.end("File not found")
-      }
-    }
-
-    if (url.startsWith("/exports/")) {
-      if (url.endsWith("/")) {
-        return fs.readdir(path.resolve("storage/exports"), (_, files) => {
-          response.setHeader("Content-Type", "application/json")
-          try {
-            return response.end(
-              JSON.stringify({
-                files: files.map((file) => ({
-                  url: `/exports/${file}`,
-                  time: fs.statSync(path.join("storage/exports", file)).mtime,
-                  size: fs.statSync(path.join("storage/exports", file)).size,
-                })),
-              }),
-            )
-          } catch (error: any) {
-            return response.end(JSON.stringify({ files: [] }))
-          }
-        })
-      }
-
-      response.setHeader("Content-Type", "application/octet-stream")
-      const filePath = path.join(path.resolve("storage"), url)
-      try {
-        return fs.createReadStream(filePath).pipe(response)
-      } catch (error: any) {
-        this.#log.error(error.message)
-        response.statusCode = 404
-        return response.end("File not found")
-      }
-    }
-
-    return this.#apiServerHandler?.(request, response)
   }
 
   // called by ApiServerPort for every new crawl request

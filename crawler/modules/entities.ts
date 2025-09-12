@@ -40,6 +40,9 @@ export const crawlTaskSchema = v.object({
 })
 export type CrawlTask = v.InferInput<typeof crawlTaskSchema>
 
+export const crawlTaskResponseSchema = v.object({
+  task: crawlTaskSchema,
+})
 export const crawlTaskConfigSchema = v.omit(crawlTaskSchema, [
   "id",
   "pageCount",
@@ -51,6 +54,9 @@ export const crawlTaskConfigSchema = v.omit(crawlTaskSchema, [
 export type CrawlTaskConfig = v.InferInput<typeof crawlTaskConfigSchema>
 
 export const crawlTaskListSchema = v.array(crawlTaskSchema)
+export const crawlTaskListResponseSchema = v.object({
+  tasks: crawlTaskListSchema,
+})
 export type CrawlTaskList = v.InferInput<typeof crawlTaskListSchema>
 
 export const htmlDataSchema = v.object({
