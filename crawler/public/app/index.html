@@ -72,10 +72,10 @@
       maxPages: parseInt(formData.get("maxPages")),
     }
 
-    await callTRPC("POST", "/createTask", taskConfig)
+    await callApi("POST", "/tasks", taskConfig)
   })
 
-  async function callTRPC(method, endpoint, input = {}) {
+  async function callApi(method, endpoint, input = {}) {
     const request = {
       method,
       headers: {
@@ -92,7 +92,7 @@
 
       if (data.error) throw new Error(data.error.message || "tRPC error")
 
-      return data.result
+      return data
     } catch (error) {
       console.error("Request failed:", error)
       throw error
@@ -121,8 +121,8 @@
   <tbody id="tasks">
     <script type="module">
       const listTasks = async () => {
-        const response = await callTRPC("GET", "/listTasks")
-        const tasks = response.data || []
+        const response = await callApi("GET", "/tasks")
+        const tasks = response.tasks || []
         const tbody = document.querySelector("#tasks")
         tbody.innerHTML = ""
 
@@ -209,7 +209,7 @@
   <tbody id="exports">
     <script type="module">
       const listExports = async () => {
-        const response = await fetch("/exports/")
+        const response = await fetch("/exports")
         const { files } = await response.json()
         const tbody = document.querySelector("#exports")
 
@@ -221,7 +221,7 @@
             const tr = document.createElement("tr")
 
             const fileName = document.createElement("td")
-            fileName.textContent = file.url.split("/").pop()
+            fileName.textContent = file.name
             tr.appendChild(fileName)
 
             const lastModified = document.createElement("td")
@@ -240,7 +240,7 @@
             actions.appendChild(downloadLink)
 
             const viewLink = document.createElement("a")
-            viewLink.href = "sql.html?file=" + encodeURIComponent(file.url)
+            viewLink.href = "/app/sql.html#" + file.url
             viewLink.textContent = "View"
             viewLink.style.marginLeft = "10px"
             viewLink.target = "_blank"

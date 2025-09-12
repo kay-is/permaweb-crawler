@@ -20,7 +20,7 @@
 
 <script type="module">
   const element = document.querySelector("pre")
-  const file = new URLSearchParams(window.location.search).get("file")
+  const file = window.location.hash.slice(1)
   if (file) {
     element.textContent = `SELECT * FROM '${file}' ORDER BY url;`
     const widget = new PondPilot.Widget(element)
