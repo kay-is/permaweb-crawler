@@ -12,7 +12,12 @@ const EXPORTS_DIRECTORY = path.join(process.cwd(), "storage/exports")
 export default class TurboSdkPageDataUploader implements PageDataUploader.PageDataUploaderOutput {
   #log = Utils.getLogger("TurboSdkPageDataUploader")
 
-  #walletPath = path.resolve(process.env.TURBO_SDK_WALLET || "wallet.json")
+  #walletPath: string = ""
+
+  async start(config: PageDataUploader.PageDataUploaderConfig) {
+    this.#walletPath = config.walletPath
+    return Utils.empty()
+  }
 
   async upload(taskId: string): Utils.PromisedResult<Entities.ArweaveTxId> {
     this.#log.info({ msg: "loading wallet", taskId: taskId, walletPath: this.#walletPath })

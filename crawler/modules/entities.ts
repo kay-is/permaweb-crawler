@@ -16,6 +16,14 @@ export const gatewayUrlSchema = v.pipe(
 )
 export type GatewayUrl = `https://${string}.${string}`
 
+export type Config = {
+  logLevel: "debug" | "info" | "warn" | "error"
+  port: number
+  walletPath: string
+  fallbackGateway: string
+  maxTasks: number
+}
+
 export const crawlerTypesSchema = v.union([v.literal("browser"), v.literal("html")])
 export type CrawlerTypes = v.InferInput<typeof crawlerTypesSchema>
 

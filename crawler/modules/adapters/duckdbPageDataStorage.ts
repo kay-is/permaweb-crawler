@@ -117,7 +117,13 @@ export default class DuckdbPageDataStorage implements PageDataStorage.PageDataSt
         Utils.tryCatch(async () => {
           duckdb.closeSync()
           await fs.unlink(path.join(DATABASE_PATH, `${storageId}.duckdb`))
-          this.#log.debug({ msg: "closed and deleted database", storageId, databasePath: dbPath })
+          await fs.unlink(path.join(EXPORTS_PATH, `${storageId}-details.parquet`))
+          await fs.unlink(path.join(EXPORTS_PATH, `${storageId}-html.parquet`))
+          this.#log.debug({
+            msg: "closed and deleted database and exports",
+            storageId,
+            databasePath: dbPath,
+          })
         }),
     })
   }

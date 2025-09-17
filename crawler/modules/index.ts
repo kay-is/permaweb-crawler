@@ -1,3 +1,4 @@
+import EnvironmentConfig from "./adapters/environmentConfig.js"
 import CrawleePlaywrightCrawler from "./adapters/crawleePlaywrightCrawler.js"
 import CrawleeNodeHtmlParserCrawler from "./adapters/crawleeNodeHtmlParserCrawler.js"
 import NodeHtmlParserExtractor from "./adapters/nodeHtmlParserExtractor.js"
@@ -9,22 +10,21 @@ import TurboSdkPageDataUploader from "./adapters/turboSdkPageDataUploader.js"
 import HonoWebServer from "./adapters/honoWebServer.js"
 
 await CrawlingService.start({
-  adapters: {
-    inputs: {
-      webServer: new HonoWebServer(),
-      crawlers: {
-        browser: new CrawleePlaywrightCrawler(),
-        html: new CrawleeNodeHtmlParserCrawler(),
-      },
-      arnsResolver: new NetworkWayfinderArnsResolver(),
+  inputs: {
+    arnsResolver: new NetworkWayfinderArnsResolver(),
+    config: new EnvironmentConfig(process.env),
+    crawlers: {
+      browser: new CrawleePlaywrightCrawler(),
+      html: new CrawleeNodeHtmlParserCrawler(),
     },
-    utils: {
-      pageDataExtractor: new NodeHtmlParserExtractor(),
-      pageDeduplicator: new SuperminhashMemoryPageDeduplicator(),
-    },
-    outputs: {
-      pageDataStorage: new DuckdbPageDataStorage(),
-      pageDataUploader: new TurboSdkPageDataUploader(),
-    },
+    webServer: new HonoWebServer(),
+  },
+  utils: {
+    pageDataExtractor: new NodeHtmlParserExtractor(),
+    pageDeduplicator: new SuperminhashMemoryPageDeduplicator(),
+  },
+  outputs: {
+    pageDataStorage: new DuckdbPageDataStorage(),
+    pageDataUploader: new TurboSdkPageDataUploader(),
   },
 })

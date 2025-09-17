@@ -22,7 +22,7 @@
   </div>
   <div style="padding-bottom: 20px">
     <label for="maxPages">Max. Pages</label><br />
-    <input type="number" name="maxPages" value="1000" min="1" max="100000" required />
+    <input type="number" name="maxPages" value="10" min="1" max="100000" required />
   </div>
   <div style="padding-bottom: 20px">
     <label for="maxPages">Similarity Threshold</label><br />
@@ -116,6 +116,7 @@
       <th>Created At</th>
       <th>Pages</th>
       <th>Duration</th>
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody id="tasks">
@@ -185,75 +186,38 @@
           }
           tr.appendChild(duration)
 
-          tbody.appendChild(tr)
-        })
-      }
-
-      await listTasks()
-      setInterval(listTasks, 5000)
-    </script>
-  </tbody>
-</table>
-
-<h2>Exports</h2>
-
-<table>
-  <thead>
-    <tr>
-      <th>File Name</th>
-      <th>Last Modified</th>
-      <th>Size (KB)</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody id="exports">
-    <script type="module">
-      const listExports = async () => {
-        const response = await fetch("/exports")
-        const { files } = await response.json()
-        const tbody = document.querySelector("#exports")
-
-        tbody.innerHTML = ""
-
-        files
-          .sort((a, b) => new Date(b.time) - new Date(a.time))
-          .forEach((file) => {
-            const tr = document.createElement("tr")
-
-            const fileName = document.createElement("td")
-            fileName.textContent = file.name
-            tr.appendChild(fileName)
-
-            const lastModified = document.createElement("td")
-            lastModified.textContent = new Date(file.time).toLocaleString()
-            tr.appendChild(lastModified)
-
-            const size = document.createElement("td")
-            size.textContent = (file.size / 1024).toFixed(2) + " KB"
-            tr.appendChild(size)
-
+          console.log(task)
+          if (task.finishedAt && !task.error) {
             const actions = document.createElement("td")
-            const downloadLink = document.createElement("a")
-            downloadLink.href = file.url
-            downloadLink.textContent = "Download"
-            downloadLink.download = file.url.split("/").pop()
-            actions.appendChild(downloadLink)
+
+            const detailsDownloadLink = document.createElement("a")
+            detailsDownloadLink.href = `https://arweave.net/${task.uploadId}/details.parquet`
+            detailsDownloadLink.textContent = "Details"
+            detailsDownloadLink.download = `${task.id}-details.parquet`
+            actions.appendChild(detailsDownloadLink)
+
+            const htmlDownloadLink = document.createElement("a")
+            htmlDownloadLink.href = `https://arweave.net/${task.uploadId}/html.parquet`
+            htmlDownloadLink.textContent = "HTML"
+            htmlDownloadLink.download = `${task.id}-html.parquet`
+            actions.appendChild(htmlDownloadLink)
 
             const viewLink = document.createElement("a")
-            viewLink.href = "/app/sql.html#" + file.url
+            viewLink.href = "/app/sql.html#" + task.uploadId
             viewLink.textContent = "View"
             viewLink.style.marginLeft = "10px"
             viewLink.target = "_blank"
             actions.appendChild(viewLink)
 
             tr.appendChild(actions)
+          }
 
-            tbody.appendChild(tr)
-          })
+          tbody.appendChild(tr)
+        })
       }
 
-      await listExports()
-      setInterval(listExports, 5000)
+      await listTasks()
+      setInterval(listTasks, 5000)
     </script>
   </tbody>
 </table>

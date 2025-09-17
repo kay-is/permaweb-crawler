@@ -63,6 +63,10 @@ const logger = pino({
   },
 })
 
+export function setLogLevel(level: "debug" | "info" | "warn" | "error") {
+  logger.level = level
+}
+
 export function getLogger(moduleName: string) {
   return logger.child({ module: moduleName })
 }

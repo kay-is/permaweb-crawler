@@ -1,7 +1,9 @@
 import crypto from "node:crypto"
+import fs from "node:fs"
 
 import * as Utils from "./utils.js"
 import type * as Entities from "./entities.js"
+import type * as Config from "./ports/config.js"
 import type * as Crawler from "./ports/crawler.js"
 import type * as PageDataExtractor from "./ports/pageDataExtractor.js"
 import type * as ArnsResolver from "./ports/arnsResolver.js"
@@ -10,30 +12,29 @@ import type * as WebServer from "./ports/webServer.js"
 import type * as PageDataUploader from "./ports/pageDataUploader.js"
 import type * as PageDeduplicator from "./ports/pageDeduplicator.js"
 
-export interface CrawlingServiceConfig {
-  adapters: {
-    inputs: {
-      webServer: WebServer.WebServerInput
-      crawlers: Record<Entities.CrawlerTypes, Crawler.CrawlerInput>
-      arnsResolver: ArnsResolver.ArnsResolverInput
-    }
-    utils: {
-      pageDataExtractor: PageDataExtractor.PageDataExtractorUtil
-      pageDeduplicator: PageDeduplicator.PageDeduplicatorUtil
-    }
-    outputs: {
-      pageDataStorage: PageDataStorage.PageDataStorageOutput
-      pageDataUploader: PageDataUploader.PageDataUploaderOutput
-    }
+export interface CrawlingServiceAdapters {
+  inputs: {
+    arnsResolver: ArnsResolver.ArnsResolverInput
+    config: Config.ConfigInput
+    crawlers: Record<Entities.CrawlerTypes, Crawler.CrawlerInput>
+    webServer: WebServer.WebServerInput
+  }
+  utils: {
+    pageDataExtractor: PageDataExtractor.PageDataExtractorUtil
+    pageDeduplicator: PageDeduplicator.PageDeduplicatorUtil
+  }
+  outputs: {
+    pageDataStorage: PageDataStorage.PageDataStorageOutput
+    pageDataUploader: PageDataUploader.PageDataUploaderOutput
   }
 }
 
 export default class CrawlingService {
-  #log = Utils.getLogger("CrawlingService")
+  #log: ReturnType<typeof Utils.getLogger>
 
-  #inputs: CrawlingServiceConfig["adapters"]["inputs"]
-  #utils: CrawlingServiceConfig["adapters"]["utils"]
-  #outputs: CrawlingServiceConfig["adapters"]["outputs"]
+  #inputs: CrawlingServiceAdapters["inputs"]
+  #utils: CrawlingServiceAdapters["utils"]
+  #outputs: CrawlingServiceAdapters["outputs"]
 
   #tasks: Record<string, Entities.CrawlTask> = {}
   #runningTask?: Entities.CrawlTask
@@ -41,19 +42,22 @@ export default class CrawlingService {
   #pageDataStores: Record<string, PageDataStorage.PageDataStore> = {}
   #pageDeduplicateStores: Record<string, PageDeduplicator.PageDuplicateStore> = {}
 
-  static async start(config: CrawlingServiceConfig) {
-    return new CrawlingService(config).start()
+  static async start(adapters: CrawlingServiceAdapters) {
+    return new CrawlingService(adapters).start()
   }
 
-  constructor(config: CrawlingServiceConfig) {
-    this.#inputs = config.adapters.inputs
-    this.#utils = config.adapters.utils
-    this.#outputs = config.adapters.outputs
+  constructor(adapters: CrawlingServiceAdapters) {
+    this.#inputs = adapters.inputs
+    this.#utils = adapters.utils
+    this.#outputs = adapters.outputs
+
+    Utils.setLogLevel(this.#inputs.config.logLevel)
+    this.#log = Utils.getLogger("CrawlingService")
   }
 
   async start() {
     const webServerStart = await this.#inputs.webServer.start({
-      port: 3000,
+      port: this.#inputs.config.port,
       handlers: {
         createTask: this.#createTaskHandler.bind(this),
         listTasks: this.#listTasksHandler.bind(this),
@@ -62,11 +66,20 @@ export default class CrawlingService {
 
     if (webServerStart.failed) return this.#log.error(webServerStart.error.message)
 
+    try {
+      const tasksJson = fs.readFileSync("storage/tasks.json", "utf-8")
+      this.#tasks = JSON.parse(tasksJson) as Record<string, Entities.CrawlTask>
+    } catch (e) {}
+
+    await this.#outputs.pageDataUploader.start(this.#inputs.config)
+
     this.#log.info({
       msg: "service started",
+      taskCount: Object.keys(this.#tasks).length,
       apiUrl: "http://localhost:3000/",
       webApptUrl: "http://localhost:3000/app/",
       exportDataUrl: "http://localhost:3000/exports/",
+      config: this.#inputs.config,
     })
   }
 
@@ -93,6 +106,13 @@ export default class CrawlingService {
         taskId: task.id,
         runningTaskId: this.#runningTask.id,
         taskCount: Object.keys(this.#tasks).length,
+      })
+    }
+    // clean up finished tasks if there are too many
+    if (Object.keys(this.#tasks).length > this.#inputs.config.maxTasks) {
+      Object.keys(this.#tasks).forEach((taskId) => {
+        const task = this.#tasks[taskId]
+        if (task && task.finishedAt) delete this.#tasks[taskId]
       })
     }
 
@@ -180,8 +200,6 @@ export default class CrawlingService {
       return this.#log.error({ msg: exportingPageData.error.message, taskId: task.id })
     }
 
-    await pageDataStore.close()
-
     this.#log.debug({ msg: "export completed", taskId: task.id })
 
     const uploadingData = await this.#outputs.pageDataUploader.upload(task.id)
@@ -190,6 +208,11 @@ export default class CrawlingService {
       task.error = uploadingData.error.message
       return this.#log.error({ msg: uploadingData.error.message, taskId: task.id })
     }
+
+    await pageDataStore.close()
+
+    delete this.#pageDataStores[task.id]
+    delete this.#pageDeduplicateStores[task.id]
 
     task.uploadId = uploadingData.data
 
@@ -201,6 +224,11 @@ export default class CrawlingService {
       pageCount: task.pageCount,
       duplicateCount: task.duplicateCount,
       uploadId: task.uploadId,
+    })
+
+    fs.writeFile("storage/tasks.json", JSON.stringify(this.#tasks, null, 2), (error) => {
+      if (error) this.#log.error({ msg: error.message, error })
+      this.#log.info({ msg: "tasks saved to storage/tasks.json" })
     })
 
     const nextTask = Object.values(this.#tasks).find((t) => t.id !== task.id && !t.finishedAt)
@@ -321,7 +349,7 @@ export default class CrawlingService {
 
     // failed requests will be retried with the ar.io gateway.
     const newUrl = new URL(resolvingWayfinderUrl.data.replace("ar://", "https://"))
-    newUrl.hostname = newUrl.hostname + ".permagate.io"
+    newUrl.hostname = newUrl.hostname + this.#inputs.config.fallbackGateway
 
     const newGatewayUrl = decodeURIComponent(newUrl.toString())
 
