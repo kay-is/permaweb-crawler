@@ -1,8 +1,0 @@
-{
-  "arnsNames": ["docs_permahub"],
-  "executeJavaScript": true,
-  "extractHashUrls": true,
-  "similarityThreshold": 0.9,
-  "maxDepth": 100,
-  "maxPages": 10
-}

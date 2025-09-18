@@ -1,0 +1,48 @@
+<!doctype html>
+
+<meta charset="UTF-8" />
+
+<title>Parquet Explorer</title>
+
+<script src="https://unpkg.com/pondpilot-widget"></script>
+
+<pre></pre>
+
+<style>
+  html,
+  body {
+    margin: 0;
+  }
+  .pondpilot-output.show {
+    max-height: 90vh;
+  }
+</style>
+
+<script type="module">
+  const element = document.querySelector("pre")
+  const txId = window.location.hash.slice(1)
+  if (txId) {
+    const detailsUrl = await downloadToFile(`https://arweave.net/${txId}/details.parquet`)
+
+    element.textContent = `SELECT * FROM '${detailsUrl}' ORDER BY url;`
+    const widget = new PondPilot.Widget(element)
+    await widget.run()
+  }
+
+  async function downloadToFile(url) {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const reader = new FileReader()
+
+      return new Promise((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    } catch (error) {
+      console.error("Error downloading file:", error)
+      throw error
+    }
+  }
+</script>

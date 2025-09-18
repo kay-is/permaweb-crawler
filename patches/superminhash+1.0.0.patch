@@ -1,0 +1,12 @@
+diff --git a/node_modules/superminhash/package.json b/node_modules/superminhash/package.json
+index ba6e0a8..9182edf 100644
+--- a/node_modules/superminhash/package.json
++++ b/node_modules/superminhash/package.json
+@@ -1,7 +1,6 @@
+ {
+     "name": "superminhash",
+     "version": "1.0.0",
+-    "type": "module",
+     "author": "Pierre (https://pierre.gg)",
+     "license": "MIT",
+     "description": "TypeScript implementation of the SuperMinHash algorithm for Jaccard similarity estimation",

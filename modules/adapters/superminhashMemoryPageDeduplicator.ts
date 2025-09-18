@@ -1,5 +1,5 @@
 import crypto from "node:crypto"
-import superminhash from "./superminhashWrapper.cjs"
+import * as Superminhash from "superminhash"
 
 import * as Utils from "../utils.js"
 import type * as PageDeduplicator from "../ports/pageDeduplicator.js"
@@ -15,7 +15,7 @@ export default class SuperminhashMemoryPageDeduplicator
   async open(storageId: string, similarityThreshold: number) {
     this.#log.debug({ msg: "opening storage", storageId, similarityThreshold })
 
-    const hashStore: superminhash.SuperMinHash[] = []
+    const hashStore: Superminhash.SuperMinHash[] = []
 
     if (similarityThreshold < 0 || similarityThreshold > 1)
       return Utils.error(new Error("similarityThreshold must be between 0 and 1"))
@@ -27,7 +27,7 @@ export default class SuperminhashMemoryPageDeduplicator
         const htmlHash = crypto.createHash("sha256").update(data).digest("hex")
         if (exactDuplicateStore.has(htmlHash)) return Utils.ok({ isDuplicate: true, similarity: 1 })
 
-        const newHash = new superminhash.SuperMinHash(SIGNATURE_SIZE, SEED)
+        const newHash = new Superminhash.SuperMinHash(SIGNATURE_SIZE, SEED)
         newHash.add(data.split(/\s+/))
 
         let isDuplicate = false

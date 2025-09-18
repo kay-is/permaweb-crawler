@@ -78,7 +78,6 @@ export default class CrawlingService {
       taskCount: Object.keys(this.#tasks).length,
       apiUrl: "http://localhost:3000/",
       webApptUrl: "http://localhost:3000/app/",
-      exportDataUrl: "http://localhost:3000/exports/",
       config: this.#inputs.config,
     })
   }

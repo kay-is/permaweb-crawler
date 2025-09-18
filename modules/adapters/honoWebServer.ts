@@ -53,7 +53,6 @@ export default class HonoWebServer implements WebServer.WebServerInput {
         })
         return context.json({ files })
       })
-      app.use("/exports/*", HonoServerStatic.serveStatic({ root: "storage" }))
 
       app.get("/tasks", async (context) => {
         const tasks = await config.handlers.listTasks()
