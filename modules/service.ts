@@ -348,7 +348,7 @@ export default class CrawlingService {
 
     // failed requests will be retried with the ar.io gateway.
     const newUrl = new URL(resolvingWayfinderUrl.data.replace("ar://", "https://"))
-    newUrl.hostname = newUrl.hostname + this.#inputs.config.fallbackGateway
+    newUrl.hostname = `${newUrl.hostname}.${this.#inputs.config.fallbackGateway}`
 
     const newGatewayUrl = decodeURIComponent(newUrl.toString())
 
