@@ -1,4 +1,5 @@
 import * as Crawlee from "crawlee"
+import * as CrawleePino from "crawlee-pino"
 import * as NodeHtmlParser from "node-html-parser"
 
 import * as Utils from "../utils.js"
@@ -30,6 +31,7 @@ export default class CrawleeNodeHtmlParserCrawler implements Crawler.CrawlerInpu
       const customRequestQueue = await CustomRequestQueue.open(config)
 
       const crawler = new Crawlee.BasicCrawler({
+        log: new Crawlee.Log({ logger: new CrawleePino.CrawleePino({ pino: this.#log }) }),
         requestHandlerTimeoutSecs: 5,
         maxConcurrency: 20,
         minConcurrency: 5,

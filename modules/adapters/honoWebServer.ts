@@ -20,6 +20,15 @@ export default class HonoWebServer implements WebServer.WebServerInput {
 
       this.#log.debug({ msg: "starting", config })
 
+      app.use("*", async (context, next) => {
+        try {
+          await next()
+        } catch (error) {
+          this.#log.error({ msg: "middleware error", error })
+          throw error
+        }
+      })
+
       app.onError((error, context) => {
         if (error instanceof HonoError.HTTPException) {
           this.#log.warn({ msg: error.message, path: context.req.path, error })
