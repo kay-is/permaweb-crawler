@@ -24,24 +24,18 @@ A Node.js-based server that crawls websites on the Permaweb via ArNS names and p
 
 6. Download the Parquet files from Arweave.
 
-## Building
+## Docker
 
-1. Install all dependencies:
-
-   ```
-   npm i
-   ```
-
-2. Compile TypeScript:
+1. Build the container image:
 
    ```
-   npm run build
+   npm run docker:build
    ```
 
-3. Run built code:
+2. Run the container image:
 
    ```
-   npm start
+   npm run docker:start
    ```
 
 ## Configuration
