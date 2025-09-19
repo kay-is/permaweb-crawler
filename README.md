@@ -64,7 +64,7 @@ The crawler uses environment variables for configuration.
 
   The gateway used to download a HTML page when a network gateway failed.
 
-  Takes a string. Default is `ar.io`.
+  Takes a string. Default is `permagate.io`.
 
 - `MAX_TASKS`
 
