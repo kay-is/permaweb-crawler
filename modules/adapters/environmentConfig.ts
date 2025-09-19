@@ -13,7 +13,7 @@ export default class EnvironmentConfig implements Config.ConfigInput {
     this.logLevel = (env.LOG_LEVEL as "debug" | "info" | "warn" | "error") || "info"
     this.port = env.PORT ? parseInt(env.PORT) : 3000
     this.walletPath = path.resolve(env.WALLET_PATH || "./wallet.json")
-    this.fallbackGateway = env.FALLBACK_GATEWAY || "ar.io"
+    this.fallbackGateway = env.FALLBACK_GATEWAY || "permagate.io"
     this.maxTasks = env.MAX_TASKS ? parseInt(env.MAX_TASKS) : 100
   }
 }
