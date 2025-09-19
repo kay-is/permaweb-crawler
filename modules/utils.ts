@@ -44,6 +44,10 @@ import pino from "pino"
 const logger = pino({
   level: "info",
   formatters: {
+    level(label: string) {
+      return { level: label }
+    },
+    
     log(obj: any) {
       if (Array.isArray(obj.msg)) {
         obj.msg = obj.msg[0]
